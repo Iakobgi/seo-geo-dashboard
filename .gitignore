@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Env files (never commit secrets)
+.env
+backend/.env
+frontend/.env
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Databases
+*.db
+*.sqlite3
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
