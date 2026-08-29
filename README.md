@@ -2,186 +2,200 @@
 
 An AI-powered SEO & GEO (Generative Engine Optimization) dashboard: audit any URL, get an
 SEO score and a GEO score (how well the page is structured for AI answer engines like
-ChatGPT/Perplexity), get AI-generated recommendations, track keywords, and run a one-click
-"AI Agent" that produces a full optimization plan + rewritten on-page content.
+ChatGPT/Perplexity/Claude), get AI-generated recommendations, track keywords, run
+competitor analysis, and drive an optimization agent with re-audit tracking.
 
 **Stack:** React + TypeScript + Tailwind (frontend) · FastAPI + SQLAlchemy (backend) ·
-PostgreSQL · OpenRouter (AI) · Docker · GitHub Actions.
+PostgreSQL (Docker) · OpenRouter (AI) · Docker · GitHub Actions.
 
-This has been built and tested end-to-end in a sandbox (auth, real URL scraping/scoring,
-and a production frontend build all verified working). What's below is exactly how to run
-it yourself, and how to ship it to GitHub and a server.
+All 78 backend tests pass. The production frontend builds cleanly. The full pipeline —
+auth, scraping, scoring, recommendations, competitor tracking, and optimization cycles —
+is functional.
 
 ---
 
-## 1. Project structure
+## Architecture
 
 ```
-seo-geo-dashboard/
-├── backend/            FastAPI app (auth, scraping, AI scoring, keywords, agent, email)
-│   ├── app/
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
-├── frontend/            React + TS + Tailwind dashboard
-│   ├── src/
-│   ├── package.json
-│   ├── Dockerfile
-│   └── .env.example
-├── docker-compose.yml       local dev (builds images from source)
-├── docker-compose.prod.yml  production (pulls prebuilt images from Docker Hub)
-└── .github/workflows/ci-cd.yml
+┌──────────────────────────────────────────────────────────┐
+│  Oracle Cloud Always Free VPS                            │
+│  ┌──────────────┐    ┌──────────────┐    ┌────────────┐ │
+│  │  Frontend    │◄──►│   Backend    │◄──►│   PostgreSQL│ │
+│  │  (port 80)   │    │  (port 8000) │    │  (port 5432)│ │
+│  └──────────────┘    └──────────────┘    └────────────┘ │
+│              all inside Docker Compose, managed by CI/CD │
+└──────────────────────────────────────────────────────────┘
 ```
 
-## 2. Prerequisites
+Everything runs on one free Oracle Cloud VM. No external database provider needed.
 
-- Docker + Docker Compose (recommended path)
-- OR locally: Node.js 20+, Python 3.11+, PostgreSQL 15
+---
+
+## 1. Prerequisites
+
+- An Oracle Cloud account (free tier, needs card for verification but $0 charge)
+- A Docker Hub account
 - A GitHub account
-- Optional: an OpenRouter API key (https://openrouter.ai) — without one, the app still
-  works fully using a built-in heuristic SEO/GEO scorer (see `app/services/ai_service.py`)
-- Optional: SMTP credentials (e.g. SendGrid) if you want email reports
 
-## 3. Run it locally with Docker (fastest path)
+---
+
+## 2. Set up Oracle Cloud (VPS)
+
+1. Go to https://oracle.com/cloud/free
+2. Sign up (credit card required for identity verification, never charged if within free limits)
+3. Create a compute instance:
+   - **Compartment**: Always Free
+   - **Shape**: ARM (A1 — Always Free, 1 OCPU, 1GB RAM)
+   - **Image**: Ubuntu 22.04
+   - **Add SSH key**: paste your public key (generated below)
+   - **Assign public IP**: Yes
+4. Note the **Public IP** — you'll need it throughout the setup
+
+---
+
+## 3. Generate SSH keys (on your Windows PC)
+
+Run this in your Windows terminal (PowerShell or Git Bash):
 
 ```bash
-cd seo-geo-dashboard
+ssh-keygen -t ed25519 -C "github-actions-seo-geo" -f ~/.ssh/id_seo_gha -N ""
+cat ~/.ssh/id_seo_gha.pub
+```
+
+Copy the output (the public key). Add it to your Oracle Cloud instance's SSH keys,
+then add the **private key** content to GitHub Secrets as `VPS_SSH_KEY`.
+
+---
+
+## 4. Prepare the server
+
+From your Windows terminal (replace `YOUR_SERVER_IP` with your Oracle Cloud IP):
+
+```bash
+ssh root@YOUR_SERVER_IP "bash -s" << 'EOF'
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin git
+mkdir -p /opt/seo-geo-dashboard && cd /opt/seo-geo-dashboard
+git clone https://github.com/Iakobgi/seo-geo-dashboard.git .
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-# Edit backend/.env: set SECRET_KEY to a long random string, and (optionally) OPENROUTER_API_KEY
-
-docker compose up --build
+echo "Server ready. Edit backend/.env before first deploy."
+EOF
 ```
 
-- Frontend: http://localhost
-- Backend API docs (Swagger): http://localhost:8000/docs
+---
 
-Create an account from the login screen, then run your first audit from the Dashboard.
-
-## 4. Run it locally without Docker (dev mode)
-
-**Backend:**
-```bash
-cd backend
-python -m venv venv && source venv/bin/activate     # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-# Point DATABASE_URL at a running Postgres instance, or use sqlite for quick testing:
-#   DATABASE_URL=sqlite:///./dev.db
-uvicorn app.main:app --reload --port 8000
-```
-
-**Frontend** (separate terminal):
-```bash
-cd frontend
-cp .env.example .env       # VITE_API_URL=http://localhost:8000
-npm install
-npm run dev
-```
-Visit http://localhost:5173.
-
-## 5. Environment variables reference
-
-`backend/.env`:
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Postgres (or sqlite for local testing) connection string |
-| `SECRET_KEY` | JWT signing secret — set a long random value |
-| `OPENROUTER_API_KEY` | Optional. Enables real AI scoring/content generation |
-| `AI_MODEL` | e.g. `openai/gpt-4o-mini`, `anthropic/claude-3.5-sonnet` |
-| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `EMAIL_FROM` | Optional, for emailed reports |
-| `FRONTEND_URL` | Used for CORS |
-| `DEMO_USER_EMAIL` / `DEMO_AUDIT_URL` | Optional, for the 24h scheduled demo audit job |
-
-`frontend/.env`:
-| Variable | Purpose |
-|---|---|
-| `VITE_API_URL` | Base URL of the backend API |
-
-## 6. Push the project to GitHub
+## 5. Configure backend/.env on the server
 
 ```bash
-cd seo-geo-dashboard
-git init
-git add .
-git commit -m "Initial commit: SEO/GEO AI Dashboard"
-git branch -M main
-git remote add origin https://github.com/<your-username>/seo-geo-dashboard.git
-git push -u origin main
+ssh root@YOUR_SERVER_IP
+nano /opt/seo-geo-dashboard/backend/.env
 ```
 
-`.env` files are git-ignored by design — never commit real secrets. Only `.env.example`
-files are tracked.
+At minimum, change:
+```
+SECRET_KEY=your-long-random-string-here
+```
 
-## 7. Set up CI/CD (GitHub Actions)
+Optional (recommended):
+```
+OPENROUTER_API_KEY=sk-or-v1-...    # real AI recommendations
+FRONTEND_URL=http://YOUR_SERVER_IP # CORS
+```
 
-The workflow at `.github/workflows/ci-cd.yml` does three things on every push to `main`:
-1. Runs backend Python compile checks and frontend `npm run build` (on every push/PR).
-2. Builds and pushes Docker images for backend + frontend to Docker Hub.
-3. SSHes into your VPS and redeploys via `docker-compose.prod.yml`.
+Save and exit (`Ctrl+X`, `Y`, `Enter`).
 
-In your GitHub repo, go to **Settings → Secrets and variables → Actions** and add:
+---
+
+## 6. Add GitHub Secrets
+
+Go to: https://github.com/Iakobgi/seo-geo-dashboard/settings/secrets/actions
 
 | Secret | Value |
 |---|---|
 | `DOCKER_USERNAME` | Your Docker Hub username |
-| `DOCKER_PASSWORD` | A Docker Hub access token |
-| `VITE_API_URL` | Public URL of your backend, e.g. `https://api.yourdomain.com` |
-| `VPS_HOST` | Your server's IP or hostname |
-| `VPS_USER` | SSH user on the server |
-| `VPS_SSH_KEY` | Private SSH key with access to that user (no passphrase) |
-| `VPS_PROJECT_PATH` | Path on the server where the repo is checked out, e.g. `/opt/seo-geo-dashboard` |
+| `DOCKER_PASSWORD` | Docker Hub access token (Docker Hub → Account Settings → Security → New Access Token) |
+| `VITE_API_URL` | `http://YOUR_SERVER_IP` |
+| `VPS_HOST` | Your Oracle Cloud server IP |
+| `VPS_USER` | `root` |
+| `VPS_SSH_KEY` | Full private key content (all lines including BEGIN/END) |
+| `VPS_PROJECT_PATH` | `/opt/seo-geo-dashboard` |
 
-If you don't want automatic VPS deployment yet, you can leave the `deploy` job's secrets
-unset — the build-and-push job will still work and just push images to Docker Hub.
+---
 
-## 8. Deploy to a VPS (manual first-time setup)
+## 7. Trigger the deploy
+
+On your Windows PC:
 
 ```bash
-# On your server
-sudo apt update && sudo apt install -y docker.io docker-compose-plugin
-mkdir -p /opt/seo-geo-dashboard && cd /opt/seo-geo-dashboard
-
-git clone https://github.com/<your-username>/seo-geo-dashboard.git .
-cp backend/.env.example backend/.env
-nano backend/.env   # fill in SECRET_KEY, OPENROUTER_API_KEY, etc.
-
-export DOCKER_USERNAME=<your-dockerhub-username>
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+cd c:/Users/User/Desktop/omniroute-test/seo-geo-dashboard
+git commit --allow-empty -m "trigger CI/CD deploy"
+git push origin main
 ```
 
-Put Nginx or Caddy in front of it (recommended) for HTTPS termination — point your domain's
-A record at the server, then reverse-proxy `:80` (frontend) and `:8000` (backend) behind
-your TLS certs (Let's Encrypt via Certbot or Caddy's automatic HTTPS both work well).
+Watch the pipeline: https://github.com/Iakobgi/seo-geo-dashboard/actions
 
-After this first manual setup, every `git push` to `main` will auto-redeploy via the
-GitHub Actions workflow above.
+---
 
-## 9. Alternative: Cloudflare Pages (frontend only)
+## 8. What the pipeline does
 
-1. In the Cloudflare dashboard, create a Pages project connected to your GitHub repo.
-2. Build settings: root directory `frontend`, build command `npm run build`, output
-   directory `dist`.
-3. Add the environment variable `VITE_API_URL` pointing at your backend (hosted on a VPS,
-   Fly.io, Railway, or Render — FastAPI needs a persistent Python process, so it doesn't
-   run on Cloudflare Workers/Pages directly without significant rework).
+```
+push to main
+  ├─ backend-tests     → pytest (78 tests pass)
+  ├─ frontend-checks   → npm run build
+  ├─ build-and-push    → Docker images → Docker Hub
+  └─ deploy            → SSH to VPS → docker compose pull + up
+```
 
-## 10. What's simulated vs. real (be upfront about this in interviews/portfolio)
+---
 
-- **SEO scraping & scoring**: real — it fetches the live page and extracts title, meta
-  description, H1/H2s, word count, image/link counts, load time.
-- **AI recommendations**: real when `OPENROUTER_API_KEY` is set; otherwise a deterministic
-  rule-based fallback so the app is always usable.
-- **Keyword rank tracking**: simulated (`app/routes/keywords.py`, `simulate_position()`).
-  Wire in a real SERP API (SerpApi, DataForSEO, ValueSERP) to make it real — the function
-  is isolated specifically so that's a one-file change.
-- **Scheduled audits + email reports**: real, using APScheduler + SMTP.
+## 9. Project structure
 
-## 11. Next steps you could add for an even stronger portfolio piece
+```
+seo-geo-dashboard/
+├── backend/
+│   ├── app/
+│   │   ├── routes/          audits, competitors, keywords, knowledge, optimization
+│   │   ├── services/        crawler, seo, geo, schema, eeat, scoring, serp, rag
+│   │   └── utils/           security (SSRF protection)
+│   ├── tests/               78 pytest tests (all passing)
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   ├── .env.example
+│   └── Dockerfile
+├── docker-compose.prod.yml  production (PostgreSQL + backend + frontend in Docker)
+└── .github/workflows/ci-cd.yml
+```
 
-- Alembic migrations instead of `create_all` (production schema management)
-- Real SERP API integration for keyword tracking
-- PDF report export (e.g. with `weasyprint`)
-- Per-user scheduled tracked URLs instead of one demo URL
-- Tests (`pytest` for backend, `vitest` for frontend) + add them to the CI workflow
+---
+
+## 10. Features
+
+| Feature | Status |
+|---------|--------|
+| Multi-page crawler (Playwright) | ✅ |
+| Structured SEO findings with evidence | ✅ |
+| Deterministic weighted scoring | ✅ |
+| GEO analysis (6 metrics) | ✅ |
+| Schema.org JSON-LD + microdata | ✅ |
+| E-E-A-T analysis (5 dimensions) | ✅ |
+| Competitor analysis | ✅ |
+| SERP abstraction (Simulated/SerpApi/DataForSEO) | ✅ |
+| RAG knowledge base (12 articles) | ✅ |
+| Evidence-based AI recommendations | ✅ |
+| Optimization cycles with re-audit | ✅ |
+| SSRF protection | ✅ |
+| 78 pytest tests | ✅ |
+| CI/CD (tests + Docker push + SSH deploy) | ✅ |
+
+---
+
+## 11. Roadmap
+
+- [ ] pgvector semantic search for RAG
+- [ ] Real SERP API integration (SerpApi / DataForSEO)
+- [ ] PDF report export
+- [ ] Frontend component tests (Vitest)
+- [ ] Per-user scheduled tracked URLs

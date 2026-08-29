@@ -1,6 +1,6 @@
 version: '3.8'
-# Used on the production server. Pulls prebuilt images pushed by CI/CD instead of
-# building from source (see docker-compose.yml for local development).
+# Production: all services run in Docker on the VPS.
+# Database is local PostgreSQL (no external service needed).
 
 services:
   db:
