@@ -6,22 +6,25 @@ from typing import List
 from app.database import get_db
 from app.dependencies import get_current_user
 from app import models, schemas
+from app.services.serp_service import SERPService, SERPResult
 
 router = APIRouter(prefix="/keywords", tags=["keywords"])
 
+# Initialize SERP service (falls back to simulated if no provider configured)
+_serp_service = SERPService.from_env()
+
 
 @router.post("/", response_model=schemas.KeywordOut)
-def create_keyword(kw: schemas.KeywordCreate, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    # NOTE: real rank tracking requires a SERP API (e.g. SerpApi, DataForSEO).
-    # Here we simulate an initial position so the tracker is usable out of the box;
-    # swap `simulate_position()` for a real SERP API call when you have a key.
+async def create_keyword(kw: schemas.KeywordCreate, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    # Use SERP service for real or simulated ranking data
+    result = await _serp_service.search(kw.keyword)
     keyword = models.Keyword(
         user_id=user.id,
         audit_id=kw.audit_id,
         keyword=kw.keyword,
-        position=simulate_position(),
+        position=result.position,
         previous_position=None,
-        volume=random.randint(50, 5000),
+        volume=result.search_volume,
     )
     db.add(keyword)
     db.commit()
@@ -35,12 +38,15 @@ def list_keywords(db: Session = Depends(get_db), user: models.User = Depends(get
 
 
 @router.post("/{keyword_id}/refresh", response_model=schemas.KeywordOut)
-def refresh_keyword(keyword_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+async def refresh_keyword(keyword_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     keyword = db.query(models.Keyword).filter(models.Keyword.id == keyword_id, models.Keyword.user_id == user.id).first()
     if not keyword:
         raise HTTPException(status_code=404, detail="Keyword not found")
     keyword.previous_position = keyword.position
-    keyword.position = simulate_position(keyword.position)
+    result = await _serp_service.search(keyword.keyword)
+    keyword.position = result.position
+    if result.search_volume:
+        keyword.volume = result.search_volume
     db.commit()
     db.refresh(keyword)
     return keyword
@@ -54,11 +60,3 @@ def delete_keyword(keyword_id: int, db: Session = Depends(get_db), user: models.
     db.delete(keyword)
     db.commit()
     return {"status": "deleted"}
-
-
-def simulate_position(previous: int = None) -> int:
-    """Placeholder ranking simulator. Replace with a real SERP API integration."""
-    if previous is None:
-        return random.randint(1, 100)
-    drift = random.randint(-5, 5)
-    return max(1, min(100, previous + drift))

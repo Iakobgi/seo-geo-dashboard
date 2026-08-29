@@ -5,12 +5,12 @@ from app.utils.helpers import heuristic_seo_score, heuristic_geo_score
 
 
 SYSTEM_PROMPT = """You are an SEO and GEO (Generative Engine Optimization) expert.
-You will be given extracted on-page data from a webpage.
+You will be given extracted on-page data from a webpage, optional knowledge context, and structured findings.
 Respond ONLY with a valid JSON object (no markdown fences, no commentary) with this exact shape:
 {
   "seo_score": <number 0-100>,
   "geo_score": <number 0-100>,
-  "suggestions": ["short actionable suggestion", ...],
+  "suggestions": ["short actionable suggestion tied to specific findings", ...],
   "generated_content": {
     "title": "...",
     "meta": "...",
@@ -19,6 +19,8 @@ Respond ONLY with a valid JSON object (no markdown fences, no commentary) with t
     "schema": { "@context": "https://schema.org", "@type": "Article" }
   }
 }
+Prioritize suggestions that are specific, evidence-based, and tied to the provided findings.
+Use the knowledge context to inform recommendations when relevant.
 """
 
 
@@ -54,11 +56,29 @@ def _fallback_result(data: dict) -> dict:
     }
 
 
-async def call_openrouter(data: dict, model: str = None) -> dict:
-    """Send extracted page data to OpenRouter and get back SEO/GEO analysis.
+async def call_openrouter(data: dict, model: str = None, rag_context: str = "") -> dict:
+    """Send extracted page data to OpenRouter with optional RAG context.
     Falls back to a deterministic heuristic if no key is set or the call fails."""
     if not settings.OPENROUTER_API_KEY:
         return _fallback_result(data)
+
+    # Build enhanced user message with knowledge context
+    findings = data.get("findings", [])
+    findings_summary = json.dumps(findings[:10], ensure_ascii=False)[:3000] if findings else "No findings."
+
+    user_message = f"""Webpage data:
+URL: {data.get('url', 'N/A')}
+Title: {data.get('title', 'N/A')}
+Meta Description: {data.get('meta_description', 'N/A')}
+Word Count: {data.get('word_count', 0)}
+H1: {data.get('h1', 'N/A')}
+H2s: {json.dumps(data.get('h2', []))}
+
+Structured findings:
+{findings_summary}
+"""
+    if rag_context:
+        user_message += f"\n\nRelevant SEO/GEO knowledge:\n{rag_context}"
 
     headers = {
         "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -68,7 +88,7 @@ async def call_openrouter(data: dict, model: str = None) -> dict:
         "model": model or settings.AI_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(data)[:8000]},
+            {"role": "user", "content": user_message[:12000]},
         ],
         "response_format": {"type": "json_object"},
     }

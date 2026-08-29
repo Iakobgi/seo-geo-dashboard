@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
-from app.routes import auth, audits, recommendations, keywords, agent, reports
+from app.routes import auth, audits, recommendations, keywords, agent, reports, analysis, competitors, knowledge, optimization
 from app.services.audit_service import perform_audit
 from app.services.email_service import send_report_email
 from app import models
@@ -28,9 +28,16 @@ app.include_router(recommendations.router)
 app.include_router(keywords.router)
 app.include_router(agent.router)
 app.include_router(reports.router)
+app.include_router(analysis.router)
+app.include_router(competitors.router)
+app.include_router(knowledge.router)
+app.include_router(optimization.router)
 
 # Create tables on startup (use Alembic migrations in real production instead).
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Warning: Could not create tables on startup (expected in Docker): {e}")
 
 
 def scheduled_audit_job():

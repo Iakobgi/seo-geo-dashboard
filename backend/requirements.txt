@@ -2,7 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 alembic==1.14.1
-psycopg2-binary==2.9.10
+psycopg2-binary>=2.9.9
 python-dotenv==1.0.1
 pydantic==2.10.3
 pydantic-settings==2.6.1
@@ -15,3 +15,12 @@ apscheduler==3.10.4
 email-validator==2.2.0
 jinja2==3.1.4
 python-multipart==0.0.20
+playwright==1.48.0
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+openai==1.56.0
+slowapi==0.1.9
+netaddr==0.10.1
+pgvector==0.3.1
+nltk==3.9.1
