@@ -1,35 +1,15 @@
 version: '3.8'
-# Production: all services run in Docker on the VPS.
-# Database is local PostgreSQL (no external service needed).
+# Production: backend + frontend on Oracle Cloud free VM.
+# Database runs on Supabase (free tier, external).
+# No local PostgreSQL container needed.
 
 services:
-  db:
-    image: postgres:15
-    container_name: seo_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: seo_db
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d seo_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     image: ${DOCKER_USERNAME}/seo-geo-backend:latest
     container_name: seo_backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
-    environment:
-      DATABASE_URL: postgresql://user:pass@db:5432/seo_db
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "8000:8000"
 
@@ -41,6 +21,3 @@ services:
       - "80:80"
     depends_on:
       - backend
-
-volumes:
-  pgdata:
