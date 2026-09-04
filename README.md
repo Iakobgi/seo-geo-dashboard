@@ -5,8 +5,11 @@ SEO score and a GEO score (how well the page is structured for AI answer engines
 ChatGPT/Perplexity/Claude), get AI-generated recommendations, track keywords, run
 competitor analysis, and drive an optimization agent with re-audit tracking.
 
-**Stack:** React + TypeScript + Tailwind (frontend) · FastAPI + SQLAlchemy (backend) ·
-PostgreSQL (Supabase free tier) · OpenRouter (AI) · Docker · GitHub Actions.
+**Stack:** React + TypeScript + Tailwind (frontend) · FastAPI + SQLAlchemy on Python 3.11
+(backend, runs as a systemd service) · PostgreSQL via Supabase Session Pooler over IPv4 ·
+OpenRouter (AI) · Nginx · GitHub Actions (SSH deploy).
+
+Live app: **http://141.145.220.152**
 
 All 78 backend tests pass. The production frontend builds cleanly. The full pipeline —
 auth, scraping, scoring, recommendations, competitor tracking, and optimization cycles —
@@ -17,32 +20,46 @@ is functional.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Oracle Cloud Always Free VM (1 OCPU, 1GB RAM)                  │
-│  ┌──────────────┐    ┌──────────────┐                         │
-│  │  Frontend    │◄──►│   Backend    │                         │
-│  │  (port 80)   │    │  (port 8000) │                         │
-│  └──────────────┘    └──────┬───────┘                         │
-│                             │                                  │
-│                      Internet (HTTPS)                           │
-│                             │                                  │
-│                      Supabase (Free Tier)                       │
-│                     PostgreSQL 15                              │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  Oracle Cloud Always Free A1 ARM VM (4 OCPU, 6 GB RAM)               │
+│  Ubuntu 22.04 · Python 3.11                                         │
+│                                                                      │
+│  ┌──────────────────┐        ┌─────────────────────┐               │
+│  │  Nginx           │  proxy  │  FastAPI backend    │               │
+│  │  /               │ ──────► │  systemd: seo-backend│              │
+│  │  (port 80)       │  /api   │  (port 8000)        │               │
+│  │  serves SPA      │ ──────► │                     │               │
+│  └──────────────────┘        └──────────┬──────────┘               │
+│                                         │                           │
+└─────────────────────────────────────────┼───────────────────────────┘
+                                          │  IPv4 Session Pooler
+                                          ▼
+                              ┌─────────────────────────┐
+                              │  Supabase PostgreSQL    │
+                              │  aws-...pooler.supabase │
+                              │  .com:5432              │
+                              └─────────────────────────┘
 ```
 
-- **Backend + Frontend**: Docker containers on Oracle Cloud free VM
-- **Database**: Supabase managed PostgreSQL (free tier: 500MB, no card needed)
-- **CI/CD**: GitHub Actions builds Docker images → pushes to Docker Hub → deploys to VPS via SSH
+- **Hosting**: single Oracle Cloud A1 ARM instance (Always Free, Ampere A1, 6 GB RAM)
+- **Database**: Supabase managed PostgreSQL connected via the **Session Pooler over IPv4**
+  (the Always Free A1 VM only has IPv6 outbound, so the direct connection string won't
+  resolve — the pooler gives us a stable IPv4 endpoint)
+- **Backend**: FastAPI on Python 3.11, managed by a `seo-backend` systemd service
+- **Frontend**: React/Vite build served by Nginx on port 80, reverse-proxying `/api/*`
+  to the backend on `127.0.0.1:8000`
+- **CI/CD**: GitHub Actions runs tests + builds the frontend, then deploys over **SSH**
+  to the VM (no Docker Hub, no containers — just `git pull` + `npm run build` +
+  `alembic upgrade head` + `systemctl restart seo-backend`)
 
 ---
 
 ## 1. Prerequisites
 
-- An Oracle Cloud account (free tier, needs card for verification but $0 charge)
-- A Supabase account (free tier, no card needed)
-- A Docker Hub account
+- An Oracle Cloud account (free tier, card required for verification but $0 charge)
+- A Supabase account (free tier)
 - A GitHub account
+- An SSH key pair for GitHub Actions (added as `VPS_SSH_KEY`)
 
 ---
 
@@ -52,73 +69,134 @@ is functional.
 2. Click **New Project**
 3. Fill in:
    - **Name**: `seo-geo-dashboard`
-   - **Database Password**: generate a strong random password (save it — you'll need it)
-   - **Region**: choose the closest to your target users
-   - **Subscription**: Free (perpetual)
-4. Click **Create new project**
-5. Wait for provisioning (takes about 2 minutes)
-6. Go to **Settings** → **Database**
-7. Copy the **Connection string** (it looks like `postgresql://postgres.YOURPROJECT:YOURPASSWORD@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`)
-8. Save this string — you'll paste it into the `.env` file on the server
+   - **Database Password**: generate a strong random password (save it)
+   - **Region**: pick one close to your VM (e.g. `eu-central-1`)
+   - **Subscription**: Free
+4. Click **Create new project** and wait for provisioning (~2 minutes)
+5. Go to **Settings** → **Database**
+6. Under **Connection string**, select **Session pooler** (NOT "Direct connection") and
+   copy the URI. It looks like:
+   ```
+   postgresql://postgres.YOURPROJECT:YOURPASSWORD@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+   ```
+   > The Session Pooler is required because the Oracle A1 ARM instance has IPv6-only
+   > outbound and the direct Supabase endpoint is IPv6.
+7. Save this string — you'll paste it into `backend/.env` on the server
 
 ---
 
-## 3. Set up Oracle Cloud (VPS)
+## 3. Provision the Oracle Cloud A1 ARM VM
 
 1. Go to https://cloud.oracle.com/ and sign in
-2. Click the hamburger menu (top left) → **Compute** → **Instances**
-3. Click **Create Instance**
-4. Fill in:
+2. Hamburger menu → **Compute** → **Instances** → **Create Instance**
+3. Fill in:
    - **Name**: `seo-backend`
-   - **Compartment**: select your compartment (or create one named `seo-geo`)
-   - **Availability Domain**: leave default
-   - **Shape**: click **Change Shape** → select **VM.Standard.E2.1.Micro** (Always Free, 1 OCPU, 1GB RAM)
-   - **Image**: Oracle Linux 9 (or Ubuntu 22.04)
-   - **Networking**: leave defaults — the form will auto-create a VCN and public subnet
-   - **Public IPv4 address**: select **Assign a public IPv4 address**
-   - **SSH Keys**: click **Paste Public Key** → paste this key:
-     ```
-     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGUKq1xUG+cNQYdDEIuR0SPnBN2Qtpt9V+PctRKi2vmk github-actions-seo-geo
-     ```
-     Then click **Add**
-5. Leave all other options (Shielded Instance, Storage, etc.) at their defaults
-6. Click **Create**
-7. Wait for the instance to reach **Running** status (green checkmark)
-8. Note the **Public IP address** shown on the instance page
+   - **Image**: Ubuntu 22.04 (or Oracle Linux 9)
+   - **Shape**: click **Change Shape** → **Ampere** → **VM.Standard.A1.Flex**
+     with **4 OCPU** and **6 GB RAM** (still Always Free, total 4 OCPU / 24 GB per tenancy)
+   - **Networking**: leave defaults; auto-creates a VCN + public subnet
+   - **Public IPv4 address**: **Assign a public IPv4 address**
+   - **SSH Keys**: **Paste Public Key** — paste the public key whose private counterpart
+     you'll use as `VPS_SSH_KEY`. Then click **Add**
+4. Leave Shielded Instance / Storage at defaults → **Create**
+5. Wait for **Running** status, then note the **Public IP** (e.g. `141.145.220.152`)
+6. In the VCN's **Security List**, open ingress TCP **80** (and optionally **22** if you
+   want SSH restricted) to `0.0.0.0/0`
 
 ---
 
 ## 4. Prepare the server
 
-SSH into your server from your Windows terminal (replace `YOUR_SERVER_IP`):
+SSH in (replace `YOUR_SERVER_IP`):
 
 ```bash
-ssh root@YOUR_SERVER_IP
+ssh ubuntu@YOUR_SERVER_IP
 ```
 
-Then run these commands on the server:
+Then run on the server (Ubuntu):
 
 ```bash
-# Install Docker and Docker Compose
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker root
+sudo apt update && sudo apt install -y python3.11 python3.11-venv python3-pip \
+    nodejs npm nginx git
 
-# Clone the project
-git clone https://github.com/Iakobgi/seo-geo-dashboard.git /opt/seo-geo-dashboard
-cd /opt/seo-geo-dashboard
+# Clone the project into the home directory (matches GitHub Actions VPS_PROJECT_PATH)
+git clone https://github.com/Iakobgi/seo-geo-dashboard.git ~/seo-geo-dashboard
+cd ~/seo-geo-dashboard
 
-# Create .env from example and edit it
 cp backend/.env.example backend/.env
 nano backend/.env
 ```
 
-In the `.env` file, update these values:
-- **DATABASE_URL**: paste your Supabase connection string from step 2
-- **SECRET_KEY**: generate a long random string (e.g., use `openssl rand -base64 32`)
-- **FRONTEND_URL**: `http://YOUR_SERVER_IP`
-- **OPENROUTER_API_KEY**: optional, for real AI recommendations
+Fill in `backend/.env`:
 
-Save and exit (`Ctrl+X`, `Y`, `Enter`).
+- **DATABASE_URL** — the Session Pooler string from step 2
+- **SECRET_KEY** — `openssl rand -base64 32`
+- **FRONTEND_URL** — `http://YOUR_SERVER_IP`
+- **OPENROUTER_API_KEY** — optional, for real AI recommendations
+
+Save and exit.
+
+#### Install backend deps and run migrations
+
+```bash
+python3.11 -m pip install --user -r backend/requirements.txt
+cd ~/seo-geo-dashboard/backend
+PYTHONPATH=. python3.11 -m alembic upgrade head
+cd ~
+```
+
+#### Create the systemd service (`seo-backend`)
+
+```bash
+sudo tee /etc/systemd/system/seo-backend.service > /dev/null <<'EOF'
+[Unit]
+Description=SEO/GEO Dashboard FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/seo-geo-dashboard/backend
+EnvironmentFile=/home/ubuntu/seo-geo-dashboard/backend/.env
+Environment=PYTHONPATH=/home/ubuntu/seo-geo-dashboard/backend
+ExecStart=/usr/bin/python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now seo-backend
+sudo systemctl status seo-backend   # should show active (running)
+```
+
+#### Install Playwright (used by the crawler)
+
+```bash
+python3.11 -m playwright install --with-deps chromium
+```
+
+#### Configure Nginx
+
+```bash
+sudo cp ~/seo-geo-dashboard/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+sudo nginx -t
+sudo systemctl enable --now nginx
+sudo systemctl reload nginx
+```
+
+The frontend nginx config proxies `/api/*` to `http://127.0.0.1:8000`, so the React
+build talks to the backend via the same origin (no CORS hassle).
+
+Open a quick sanity check from your laptop:
+
+```bash
+curl http://YOUR_SERVER_IP/api/health
+```
+
+You should get a JSON `{"status":"ok",...}`.
 
 ---
 
@@ -126,23 +204,22 @@ Save and exit (`Ctrl+X`, `Y`, `Enter`).
 
 Go to: https://github.com/Iakobgi/seo-geo-dashboard/settings/secrets/actions
 
-Add these secrets:
-
 | Secret | Value |
 |---|---|
-| `DOCKER_USERNAME` | Your Docker Hub username |
-| `DOCKER_PASSWORD` | Docker Hub access token (Docker Hub → Account Settings → Security → New Access Token) |
-| `VITE_API_URL` | `http://YOUR_SERVER_IP` |
-| `VPS_HOST` | Your Oracle Cloud server IP |
-| `VPS_USER` | `root` |
-| `VPS_SSH_KEY` | Full private key content (the file at `~/.ssh/id_seo_gha` — copy all lines including BEGIN/END) |
-| `VPS_PROJECT_PATH` | `/opt/seo-geo-dashboard` |
+| `VPS_HOST` | `141.145.220.152` (or your Oracle public IP) |
+| `VPS_USER` | `ubuntu` (or `opc` for Oracle Linux) — **not `root`** |
+| `VPS_SSH_KEY` | Full private key contents (BEGIN/END lines included) for the public key you pasted at VM creation |
+| `VPS_PROJECT_PATH` | `/home/ubuntu/seo-geo-dashboard` (must match `~`) |
+| `VITE_API_URL` | (not required when nginx reverse-proxies — the build defaults to same-origin `/api`) |
+
+> No `DOCKER_USERNAME` / `DOCKER_PASSWORD` needed anymore — the pipeline no longer
+> builds or pushes container images.
 
 ---
 
 ## 6. Trigger the deploy
 
-On your Windows PC:
+From your local machine:
 
 ```bash
 cd c:/Users/User/Desktop/omniroute-test/seo-geo-dashboard
@@ -158,11 +235,20 @@ Watch the pipeline: https://github.com/Iakobgi/seo-geo-dashboard/actions
 
 ```
 push to main
-  ├─ backend-tests      → pytest (78 tests pass)
-  ├─ frontend-checks    → npm run build
-  ├─ build-and-push     → Docker images → Docker Hub
-  └─ deploy             → SSH to VPS → docker compose pull + up
+  ├─ backend-tests      → pytest (Python 3.11, 78 tests pass)
+  ├─ frontend-checks    → npm ci + npm run build
+  └─ deploy (needs tests)
+       └─ appleboy/ssh-action → VPS
+            ├─ git pull origin main
+            ├─ ensure nginx + copy nginx.conf + reload
+            ├─ pip install --user backend/requirements.txt
+            ├─ npm ci && VITE_API_URL=... && npm run build
+            ├─ publish dist/ to /usr/share/nginx/html/
+            ├─ alembic upgrade head
+            └─ systemctl restart seo-backend   (or start on first deploy)
 ```
+
+No Docker, no Docker Hub, no image pulls — just SSH, git, pip, npm, and systemd.
 
 ---
 
@@ -178,13 +264,14 @@ seo-geo-dashboard/
 │   ├── tests/               78 pytest tests (all passing)
 │   ├── requirements.txt
 │   ├── .env.example
-│   └── Dockerfile
+│   └── Dockerfile           (kept for reference, not used in deploy)
 ├── frontend/
 │   ├── src/
 │   ├── package.json
 │   ├── .env.example
-│   └── Dockerfile
-├── docker-compose.prod.yml  production (backend + frontend, Supabase for DB)
+│   ├── nginx.conf           (prod nginx site config; reverse-proxies /api → :8000)
+│   └── Dockerfile           (kept for reference, not used in deploy)
+├── docker-compose.prod.yml  (legacy, not used — A1 deploy is systemd + nginx)
 └── .github/workflows/ci-cd.yml
 ```
 
@@ -207,7 +294,7 @@ seo-geo-dashboard/
 | Optimization cycles with re-audit | ✅ |
 | SSRF protection | ✅ |
 | 78 pytest tests | ✅ |
-| CI/CD (tests + Docker push + SSH deploy) | ✅ |
+| CI/CD (tests + SSH deploy via GitHub Actions) | ✅ |
 
 ---
 
@@ -215,17 +302,30 @@ seo-geo-dashboard/
 
 | Resource | Limit | Your Usage |
 |----------|-------|------------|
-| Compute | 2 ARM VMs (1 OCPU, 1GB RAM each) | 1 VM ✅ |
-| Storage | 200GB block storage | ~10GB ✅ |
-| Bandwidth | 10TB egress/month | Light traffic ✅ |
+| Compute (ARM A1) | 4 OCPU, 24 GB RAM total per tenancy | 4 OCPU, 6 GB RAM ✅ |
+| Block storage | 200 GB total | ~10 GB ✅ |
+| Bandwidth | 10 TB egress / month | Light traffic ✅ |
 
-As long as you stay on the VM.Standard.E2.1.Micro shape and don't add extra services, you'll stay within free limits.
+As long as the total A1 allocation across all your VMs stays ≤ 4 OCPU / 24 GB RAM,
+you remain in the Always Free tier.
 
 ---
 
 ## 11. Troubleshooting
 
-- **PostgreSQL connection errors**: check DATABASE_URL in backend/.env — make sure it matches your Supabase connection string exactly
-- **Port 80 or 8000 not accessible**: check Oracle Cloud firewall rules — allow inbound TCP on ports 80 and 8000
-- **SSH key rejected**: make sure you pasted the full public key including `ssh-ed25519` prefix
-- **Build fails in CI**: check the Actions tab for error logs — most failures are due to missing environment variables
+- **PostgreSQL connection errors / `could not translate host name`**:
+  you pasted the *direct* connection string. Switch to the **Session pooler** string in
+  Supabase → Settings → Database (the A1 VM only has IPv6 outbound, and the pooler gives
+  you a stable IPv4 endpoint on port 5432).
+- **`421 Misdirected Request` or 502 from nginx**: the backend isn't running. Check
+  `sudo systemctl status seo-backend` and `journalctl -u seo-backend -e`.
+- **`/api/*` returns 404**: nginx config wasn't reloaded. `sudo nginx -t &&
+  sudo systemctl reload nginx`, and confirm `/etc/nginx/conf.d/default.conf` matches
+  `frontend/nginx.conf` in the repo.
+- **SSH key rejected by GitHub Actions**: the public key pasted at VM creation must
+  match the private key in the `VPS_SSH_KEY` secret. `ssh -i ~/.ssh/id_xxx ubuntu@IP`
+  from your laptop to verify it works locally first.
+- **Build fails in CI**: check the Actions tab; most failures are missing secrets or a
+  diverged `VPS_PROJECT_PATH` between the secret and the repo path on the VM.
+- **Playwright missing browsers on the server**: re-run
+  `python3.11 -m playwright install --with-deps chromium`.
