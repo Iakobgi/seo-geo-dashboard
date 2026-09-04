@@ -35,7 +35,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend deps
         working-directory: frontend
-        run: npm install
+        run: npm ci
       - name: Build frontend
         working-directory: frontend
         run: npm run build
@@ -66,21 +66,25 @@ jobs:
               sudo systemctl enable nginx
             fi
             sudo cp frontend/nginx.conf /etc/nginx/conf.d/default.conf
-            sudo nginx -t && sudo systemctl reload nginx
+            sudo nginx -t
+            sudo systemctl enable --now nginx
+            sudo systemctl reload nginx
 
             # Install backend deps
-            python3 -m pip install --user -q -r backend/requirements.txt
+            python3.11 -m pip install --user -q -r backend/requirements.txt
 
             # Build frontend with API URL
             cd frontend
-            npm install --production
-            export VITE_API_URL=http://${{ secrets.VPS_HOST }}
+            npm ci
+            export VITE_API_URL=http://${{ secrets.VPS_HOST }}:8000
             npm run build
+            sudo rm -rf /usr/share/nginx/html/*
+            sudo cp -r dist/. /usr/share/nginx/html/
             cd ..
 
             # Run migrations
             cd backend
-            python3 -m alembic upgrade head
+            python3.11 -m alembic upgrade head
             cd ..
 
             # Restart backend
@@ -90,7 +94,7 @@ jobs:
               pkill -f "uvicorn app.main:app" 2>/dev/null || true
               sleep 1
               cd backend
-              nohup python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+              nohup python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
               cd ..
             fi
 
