@@ -16,6 +16,9 @@ class User(Base):
     audits = relationship("Audit", back_populates="user", cascade="all, delete-orphan")
     keywords = relationship("Keyword", back_populates="user", cascade="all, delete-orphan")
     competitors = relationship("Competitor", back_populates="user", cascade="all, delete-orphan")
+    optimization_cycles = relationship(
+        "OptimizationCycle", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Audit(Base):
@@ -38,7 +41,6 @@ class Audit(Base):
 
     user = relationship("User", back_populates="audits")
     recommendations = relationship("Recommendation", back_populates="audit", cascade="all, delete-orphan")
-    optimization_cycles = relationship("OptimizationCycle", back_populates="user", cascade="all, delete-orphan")
     keywords = relationship("Keyword", back_populates="audit")
     findings = relationship("Finding", back_populates="audit", cascade="all, delete-orphan")
     snapshots = relationship("AuditSnapshot", back_populates="audit", cascade="all, delete-orphan")
@@ -113,7 +115,7 @@ class Competitor(Base):
     url = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", back_populates="audits")
+    user = relationship("User", back_populates="competitors")
     competitor_audits = relationship("CompetitorAudit", back_populates="competitor", cascade="all, delete-orphan")
 
 
@@ -158,7 +160,7 @@ class OptimizationCycle(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = relationship("User")
+    user = relationship("User", back_populates="optimization_cycles")
     steps = relationship("OptimizationStep", back_populates="cycle", cascade="all, delete-orphan")
 
 
