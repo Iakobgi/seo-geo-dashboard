@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   backend-tests:
@@ -23,6 +28,26 @@ jobs:
       - name: Run pytest
         working-directory: backend
         run: PYTHONPATH=. pytest tests/ -v --tb=short
+      - name: Test authentication through production proxy
+        env:
+          DATABASE_URL: sqlite+pysqlite:////tmp/seo-proxy-test.db
+          SECRET_KEY: ci-only-proxy-test-secret
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nginx
+          PYTHONPATH=backend python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          backend_pid=$!
+          trap 'kill "$backend_pid"' EXIT
+          sed 's/listen 80;/listen 8080;/' frontend/nginx.conf | sudo tee /etc/nginx/conf.d/seo-proxy-test.conf >/dev/null
+          sudo nginx -t
+          sudo systemctl restart nginx
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:8000/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          python scripts/check_deployment.py http://localhost:8080/api --test-auth
 
   frontend-checks:
     runs-on: ubuntu-latest
@@ -43,7 +68,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-checks]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     steps:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -53,12 +78,24 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            export PATH=$HOME/local/bin:$PATH
-            export PYTHONPATH=~/seo-geo-dashboard/backend
-            cd ${{ secrets.VPS_PROJECT_PATH }}
+            export PATH="$HOME/.local/bin:$PATH"
+            cd "${{ secrets.VPS_PROJECT_PATH }}"
+            export PYTHONPATH="$PWD/backend"
 
             # Pull latest code
-            git pull origin main
+            git pull --ff-only origin main
+
+            # Fail before publishing frontend/config changes if the DB is unavailable.
+            python3.11 -m pip install --user -q -r backend/requirements.txt
+            cd backend
+            python3.11 -m alembic upgrade head
+            cd ..
+
+            cd frontend
+            npm ci
+            export VITE_API_URL=/api
+            npm run build
+            cd ..
 
             # Ensure nginx is installed and configured
             if ! command -v nginx &>/dev/null; then
@@ -78,41 +115,27 @@ jobs:
             sudo systemctl enable --now nginx
             sudo systemctl reload nginx
 
-            # Install backend deps
-            python3.11 -m pip install --user -q -r backend/requirements.txt
-
-            # Build frontend with API URL
-            cd frontend
-            npm ci
-            export VITE_API_URL=/api
-            npm run build
-            sudo rm -rf /usr/share/nginx/html/*
-            sudo cp -r dist/. /usr/share/nginx/html/
-            cd ..
-
-            # Run migrations
-            cd backend
-            python3.11 -m alembic upgrade head
-            cd ..
+            # Keep old hashed assets available for already-open browser tabs.
+            sudo cp -r frontend/dist/. /usr/share/nginx/html/
 
             # Restart backend
-            if systemctl is-active --quiet seo-backend 2>/dev/null; then
+            if systemctl cat seo-backend >/dev/null 2>&1; then
               sudo systemctl restart seo-backend
             else
-              pkill -f "uvicorn app.main:app" 2>/dev/null || true
+              pkill -f "[u]vicorn app.main:app" 2>/dev/null || true
               sleep 1
               cd backend
-              nohup python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+              nohup python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 < /dev/null > /tmp/uvicorn.log 2>&1 &
               cd ..
             fi
 
             for attempt in $(seq 1 30); do
-                if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+                if curl --fail --silent --max-time 5 http://127.0.0.1:8000/health/ready >/dev/null; then
                     break
                 fi
                 sleep 1
             done
 
-            curl --fail --silent http://127.0.0.1/api/health >/dev/null
+            python3.11 scripts/check_deployment.py http://127.0.0.1/api
 
             echo "✅ Deploy successful! App at http://${{ secrets.VPS_HOST }}"

@@ -74,3 +74,22 @@ def test_registration_rejects_duplicate_email(client):
     response = client.post("/auth/register", json=payload)
 
     assert response.status_code == 400
+
+
+def test_readiness_checks_database(client):
+    response = client.get("/health/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready"}
+
+
+def test_readiness_hides_database_connection_details(client):
+    from unittest.mock import patch
+    from sqlalchemy.exc import OperationalError
+
+    with patch("app.main.engine") as engine:
+        engine.connect.side_effect = OperationalError(
+            "connect", {}, Exception("private connection details")
+        )
+        response = client.get("/health/ready")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database unavailable"}

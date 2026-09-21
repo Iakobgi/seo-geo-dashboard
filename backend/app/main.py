@@ -1,7 +1,9 @@
 import asyncio
 import atexit
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -77,3 +79,15 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/health/ready")
+def readiness():
+    """Require database access before declaring a deployment ready."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        # Connection errors may contain credentials or infrastructure details.
+        raise HTTPException(status_code=503, detail="Database unavailable") from None
+    return {"status": "ready"}
