@@ -1,0 +1,32 @@
+name: Diagnose VPS proxy
+
+on:
+  push:
+    branches: [codex/diagnose-vps-proxy]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect backend and proxy connectivity
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo 'Backend readiness'
+            curl --silent --show-error --max-time 10 -i http://127.0.0.1:8000/health/ready
+            echo 'Nginx readiness'
+            curl --silent --show-error --max-time 10 -i http://127.0.0.1/api/health/ready
+            echo 'SELinux mode and proxy permissions'
+            command -v getenforce >/dev/null && getenforce || true
+            command -v getsebool >/dev/null && getsebool httpd_can_network_connect httpd_can_network_relay || true
+            echo 'Recent loopback health-check proxy errors only'
+            sudo tail -n 100 /var/log/nginx/error.log | grep 'client: 127.0.0.1' | grep 'GET /api/health' | tail -n 5 || true
+            echo 'Service status'
+            systemctl is-active seo-backend nginx || true
