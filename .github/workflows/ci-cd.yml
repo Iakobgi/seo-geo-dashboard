@@ -110,6 +110,13 @@ jobs:
                 fi
                 sudo systemctl enable nginx
             fi
+
+            # Oracle Linux/RHEL require this permission for Nginx reverse proxying.
+            # Keep SELinux enabled; authorize the web server's network connections.
+            if command -v getenforce >/dev/null && [ "$(getenforce)" != "Disabled" ]; then
+                sudo setsebool -P httpd_can_network_connect on
+            fi
+
             sudo cp frontend/nginx.conf /etc/nginx/conf.d/default.conf
             sudo nginx -t
             sudo systemctl enable --now nginx

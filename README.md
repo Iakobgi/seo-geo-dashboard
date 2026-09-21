@@ -330,6 +330,11 @@ you remain in the Always Free tier.
   you a stable IPv4 endpoint on port 5432).
 - **`421 Misdirected Request` or 502 from nginx**: the backend isn't running. Check
   `sudo systemctl status seo-backend` and `journalctl -u seo-backend -e`.
+- **502 while the backend health endpoint works directly**: on Oracle Linux/RHEL,
+  check the Nginx error log for `connect() ... failed (13: Permission denied)`.
+  SELinux must permit Nginx to connect to the backend:
+  `sudo setsebool -P httpd_can_network_connect on`. The deployment applies this
+  setting when SELinux is enabled; SELinux remains enabled.
 - **`/api/*` returns 404**: nginx config wasn't reloaded. `sudo nginx -t &&
   sudo systemctl reload nginx`, and confirm `/etc/nginx/conf.d/default.conf` matches
   `frontend/nginx.conf` in the repo.
