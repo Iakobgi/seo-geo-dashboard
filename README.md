@@ -313,6 +313,17 @@ you remain in the Always Free tier.
 
 ## 11. Troubleshooting
 
+- **Supabase `tenant/user ... not found` during deployment**: sign in to the
+  existing Supabase project and check its status. Resume it if paused, then copy
+  its current **Session pooler** connection details from **Connect**. Confirm the
+  pooler host, region, and `postgres.<project-ref>` username match that project.
+  Update `DATABASE_URL` in the server's `backend/.env` if needed; never commit it.
+  Re-run CI/CD from the Actions tab after restoring connectivity. Do not replace
+  the database with an empty database to work around this error.
+- **Deployment verification**: `/api/health/ready` must return HTTP 200 and JSON
+  `{"status":"ready"}`. It returns 503 when the database cannot be reached.
+  CI also exercises registration, login, and authenticated profile retrieval
+  through the production Nginx config using a disposable SQLite database.
 - **PostgreSQL connection errors / `could not translate host name`**:
   you pasted the *direct* connection string. Switch to the **Session pooler** string in
   Supabase → Settings → Database (the A1 VM only has IPv6 outbound, and the pooler gives
