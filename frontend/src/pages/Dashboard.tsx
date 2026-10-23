@@ -1,67 +1,219 @@
-import React, { useEffect, useState, useCallback } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { auditsApi, keywordsApi, type Audit, type Keyword } from '../api/endpoints'
-import SEOScoreCard from '../components/SEOScoreCard'
-import RecommendationList from '../components/RecommendationList'
-import KeywordTracker from '../components/KeywordTracker'
-import AuditForm from '../components/AuditForm'
-
-const Dashboard: React.FC = () => {
-  const [audits, setAudits] = useState<Audit[]>([])
-  const [keywords, setKeywords] = useState<Keyword[]>([])
-  const [loading, setLoading] = useState(true)
-
+import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+import { Search, Tags, ListChecks, Globe2, ArrowUpRight } from "lucide-react";
+import {
+  auditsApi,
+  keywordsApi,
+  type Audit,
+  type Keyword,
+} from "../api/endpoints";
+import { errorMessage } from "../api/helpers";
+import SEOScoreCard from "../components/SEOScoreCard";
+import RecommendationList from "../components/RecommendationList";
+import KeywordTracker from "../components/KeywordTracker";
+import AuditForm from "../components/AuditForm";
+import { Loading, Notice, Empty, PageHeading } from "../components/UI";
+export default function Dashboard() {
+  const [audits, setAudits] = useState<Audit[]>([]);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [url, setUrl] = useState("");
   const refresh = useCallback(async () => {
-    const [auditsRes, keywordsRes] = await Promise.all([auditsApi.list(), keywordsApi.list()])
-    setAudits(auditsRes.data)
-    setKeywords(keywordsRes.data)
-    setLoading(false)
-  }, [])
-
+    setError(null);
+    const results = await Promise.allSettled([
+      auditsApi.list(),
+      keywordsApi.list(),
+    ]);
+    if (results[0].status === "fulfilled") setAudits(results[0].value.data);
+    if (results[1].status === "fulfilled") setKeywords(results[1].value.data);
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected")
+      setError(
+        errorMessage(failed.reason, "Some workspace data could not be loaded."),
+      );
+    setLoading(false);
+  }, []);
   useEffect(() => {
-    refresh()
-  }, [refresh])
-
-  if (loading) return <div className="p-6">Loading...</div>
-
-  const latest = audits[0]
-  const history = [...audits]
+    void refresh();
+  }, [refresh]);
+  if (loading) return <Loading />;
+  const latest = audits[0];
+  const urls = [...new Set(audits.map((a) => a.url))];
+  const chartUrl = urls.includes(url) ? url : latest?.url;
+  const history = audits
+    .filter((a) => a.url === chartUrl)
+    .slice()
     .reverse()
-    .map((a) => ({ date: new Date(a.created_at).toLocaleDateString(), seo: a.seo_score, geo: a.geo_score }))
-
+    .map((a) => ({
+      date: new Date(a.created_at).toLocaleString(),
+      seo: a.seo_score,
+      geo: a.geo_score,
+    }));
+  const pending = audits
+    .flatMap((a) => a.recommendations)
+    .filter((r) => r.type === "suggestion" && r.status === "pending").length;
+  const stats = [
+    {
+      label: "Audits completed",
+      value: audits.length,
+      note: "Your full audit history",
+      icon: Search,
+    },
+    {
+      label: "Pages analyzed",
+      value: urls.length,
+      note: "Unique website URLs",
+      icon: Globe2,
+    },
+    {
+      label: "Keywords tracked",
+      value: keywords.length,
+      note: "In your keyword watchlist",
+      icon: Tags,
+    },
+    {
+      label: "Open recommendations",
+      value: pending,
+      note: "Opportunities to work through",
+      icon: ListChecks,
+    },
+  ];
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-
+    <div className="space-y-6">
+      <PageHeading
+        title="A clearer view. A smarter next move."
+        description="Your search performance and AI readiness, together in one place."
+        action={
+          <Link to="/audits" className="button button-secondary">
+            View all audits <ArrowUpRight size={15} />
+          </Link>
+        }
+      />
+      {error && <Notice retry={refresh}>{error}</Notice>}
+      <div className="stat-grid">
+        {stats.map(({ label, value, note, icon: Icon }) => (
+          <div key={label} className="stat-card">
+            <div>
+              {label}
+              <Icon size={16} />
+            </div>
+            <strong>{value}</strong>
+            <p>{note}</p>
+          </div>
+        ))}
+      </div>
       <AuditForm onCreated={refresh} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="dashboard-grid">
         <SEOScoreCard audit={latest} />
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-lg font-semibold mb-3">Score history</h2>
+        <div className="panel">
+          <div className="table-toolbar">
+            <div>
+              <h2 className="panel-title">Progress over time</h2>
+              <p className="panel-subtitle mb-0">
+                Compare audits of the same page.
+              </p>
+            </div>
+            {urls.length > 0 && (
+              <select
+                className="search-input max-w-full"
+                style={{ minWidth: 0, width: 180 }}
+                aria-label="Page for score history"
+                value={chartUrl}
+                onChange={(e) => setUrl(e.target.value)}
+              >
+                {urls.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            )}
+          </div>
           {history.length === 0 ? (
-            <p className="text-sm text-gray-500">No audits yet.</p>
+            <Empty title="Watch your progress take shape">
+              Run an audit to begin. Re-audit the same page after making
+              improvements.
+            </Empty>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={history}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis domain={[0, 100]} fontSize={12} />
-                <Tooltip />
-                <Line type="monotone" dataKey="seo" stroke="#3b82f6" name="SEO" />
-                <Line type="monotone" dataKey="geo" stroke="#10b981" name="GEO" />
-              </LineChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={230}>
+                <LineChart
+                  data={history}
+                  margin={{ top: 12, right: 10, left: -25, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 5"
+                    vertical={false}
+                    stroke="#e9efed"
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 9, fill: "#91a19c" }}
+                    tickFormatter={(value) => value.split(",")[0]}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={30}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 10, fill: "#91a19c" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 10,
+                      border: "1px solid #e2e8eb",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Legend
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: 11, paddingTop: 15 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="seo"
+                    stroke="#4f719b"
+                    strokeWidth={2.5}
+                    name="SEO"
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="geo"
+                    stroke="#4a9b80"
+                    strokeWidth={2.5}
+                    name="GEO"
+                    dot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              {history.length === 1 && (
+                <p className="panel-subtitle mt-3 mb-0">
+                  Re-audit this page to see how your scores change.
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecommendationList recommendations={latest?.recommendations ?? []} onChanged={refresh} />
+      <div className="dashboard-grid">
+        <RecommendationList
+          recommendations={latest?.recommendations ?? []}
+          onChanged={refresh}
+        />
         <KeywordTracker keywords={keywords} onChanged={refresh} />
       </div>
     </div>
-  )
+  );
 }
-
-export default Dashboard

@@ -56,3 +56,29 @@ class TestSSRFProtection:
         """Test validate_url accepts public URLs."""
         url = validate_url("https://example.com/page")
         assert url == "https://example.com/page"
+
+
+def test_ipv6_private_and_mapped_addresses_are_blocked():
+    assert not is_safe_url('http://[fd00::1]/')
+    assert not is_safe_url('http://[fe80::1]/')
+    assert not is_safe_url('http://[::ffff:127.0.0.1]/')
+    assert not is_safe_url('http://[ff02::1]/')
+
+
+def test_dns_failure_and_private_dns_answers_are_blocked():
+    import socket
+    from unittest.mock import patch
+    with patch('socket.getaddrinfo', side_effect=socket.gaierror()):
+        assert not is_safe_url('https://unresolvable.example/')
+    with patch('socket.getaddrinfo', return_value=[(socket.AF_INET6, socket.SOCK_STREAM, 6, '', ('fd00::1', 443, 0, 0))]):
+        assert not is_safe_url('https://private.example/')
+
+
+@pytest.mark.asyncio
+async def test_crawler_rejects_private_redirect_destination():
+    import httpx
+    from app.services.crawler_service import validate_crawl_request, CrawlerService
+    with pytest.raises(ValueError):
+        await validate_crawl_request(httpx.Request('GET', 'http://169.254.169.254/latest/meta-data/'))
+    with pytest.raises(ValueError):
+        await CrawlerService().crawl('http://127.0.0.1/')

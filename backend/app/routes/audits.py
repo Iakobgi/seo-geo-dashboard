@@ -53,6 +53,40 @@ def list_audits(db: Session = Depends(get_db), user: models.User = Depends(get_c
     )
 
 
+@router.get("/compare")
+def compare_audits(
+    audit_id_1: int,
+    audit_id_2: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Compare two audits and return differences."""
+    audit1 = db.query(models.Audit).filter(models.Audit.id == audit_id_1, models.Audit.user_id == user.id).first()
+    audit2 = db.query(models.Audit).filter(models.Audit.id == audit_id_2, models.Audit.user_id == user.id).first()
+
+    if not audit1 or not audit2:
+        raise HTTPException(status_code=404, detail="One or both audits not found")
+
+    return {
+        "audit_1": {
+            "id": audit1.id,
+            "url": audit1.url,
+            "seo_score": audit1.seo_score,
+            "geo_score": audit1.geo_score,
+            "created_at": audit1.created_at,
+        },
+        "audit_2": {
+            "id": audit2.id,
+            "url": audit2.url,
+            "seo_score": audit2.seo_score,
+            "geo_score": audit2.geo_score,
+            "created_at": audit2.created_at,
+        },
+        "seo_score_change": audit2.seo_score - audit1.seo_score,
+        "geo_score_change": audit2.geo_score - audit1.geo_score,
+    }
+
+
 @router.get("/{audit_id}", response_model=schemas.AuditDetail)
 def get_audit(audit_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     audit = db.query(models.Audit).filter(models.Audit.id == audit_id, models.Audit.user_id == user.id).first()
@@ -107,6 +141,10 @@ def get_audit_scores(
     # Get findings
     findings = db.query(models.Finding).filter(models.Finding.audit_id == audit_id).all()
 
+    finding_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "pass": 0}
+    for finding in findings:
+        finding_counts[finding.severity] = finding_counts.get(finding.severity, 0) + 1
+
     # Get category analyses from snapshot if available
     snapshot = db.query(models.AuditSnapshot).filter(models.AuditSnapshot.audit_id == audit_id).first()
 
@@ -128,11 +166,6 @@ def get_audit_scores(
         # Calculate on-the-fly from findings
         # This is a simplified version - full analysis would require re-crawling
         scoring_service = ScoringService()
-        # Get finding counts for breakdown
-        finding_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "pass": 0}
-        for finding in findings:
-            finding_counts[finding.severity] = finding_counts.get(finding.severity, 0) + 1
-
         categories = [
             {
                 "category": "title_meta",
@@ -160,7 +193,6 @@ def get_audit_scores(
 
     return schemas.ScoreBreakdownOut(
         overall_score=audit.seo_score,
-        geo_score=audit.geo_score or 50.0,
         categories=categories,
         formula=f"Overall SEO Score: {audit.seo_score}",
         finding_counts=finding_counts,
@@ -175,6 +207,9 @@ def get_audit_finding(
     user: models.User = Depends(get_current_user),
 ):
     """Get a specific finding for an audit."""
+    audit = db.query(models.Audit).filter(models.Audit.id == audit_id, models.Audit.user_id == user.id).first()
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
     finding = (
         db.query(models.Finding)
         .filter(
@@ -221,40 +256,6 @@ def get_audit_history(
             for s in snapshots
         ],
         "total_snapshots": len(snapshots),
-    }
-
-
-@router.get("/compare")
-def compare_audits(
-    audit_id_1: int,
-    audit_id_2: int,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user),
-):
-    """Compare two audits and return differences."""
-    audit1 = db.query(models.Audit).filter(models.Audit.id == audit_id_1, models.Audit.user_id == user.id).first()
-    audit2 = db.query(models.Audit).filter(models.Audit.id == audit_id_2, models.Audit.user_id == user.id).first()
-
-    if not audit1 or not audit2:
-        raise HTTPException(status_code=404, detail="One or both audits not found")
-
-    return {
-        "audit_1": {
-            "id": audit1.id,
-            "url": audit1.url,
-            "seo_score": audit1.seo_score,
-            "geo_score": audit1.geo_score,
-            "created_at": audit1.created_at,
-        },
-        "audit_2": {
-            "id": audit2.id,
-            "url": audit2.url,
-            "seo_score": audit2.seo_score,
-            "geo_score": audit2.geo_score,
-            "created_at": audit2.created_at,
-        },
-        "seo_score_change": audit2.seo_score - audit1.seo_score,
-        "geo_score_change": (audit2.geo_score or 50) - (audit1.geo_score or 50),
     }
 
 

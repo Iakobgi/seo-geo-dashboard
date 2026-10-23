@@ -1,48 +1,74 @@
-import React from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
-import type { Audit } from '../api/endpoints'
-
-const COLORS = ['#3b82f6', '#10b981']
-
-const SEOScoreCard: React.FC<{ audit?: Audit }> = ({ audit }) => {
-  if (!audit) {
-    return (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold mb-2">Latest Audit</h2>
-        <p className="text-gray-500 text-sm">Run your first audit to see scores here.</p>
-      </div>
-    )
-  }
-
-  const data = [
-    { name: 'SEO', value: audit.seo_score },
-    { name: 'GEO', value: audit.geo_score },
-  ]
-
+import type { Audit } from "../api/endpoints";
+import { Empty } from "./UI";
+function Ring({
+  value,
+  label,
+  color,
+}: {
+  value: number;
+  label: string;
+  color: string;
+}) {
+  const score = Math.max(0, Math.min(100, value));
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <h2 className="text-lg font-semibold mb-1">Latest Audit</h2>
-      <p className="text-sm text-gray-500 mb-4 truncate">{audit.url}</p>
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={80} dataKey="value" label>
-            {data.map((entry, index) => (
-              <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="flex justify-around mt-2 text-sm">
+    <div>
+      <div
+        className="score-ring"
+        role="img"
+        aria-label={`${label}: ${score} out of 100`}
+      >
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle
+            cx="60"
+            cy="60"
+            r="51"
+            fill="none"
+            stroke="#edf1f2"
+            strokeWidth="7"
+          />
+          <circle
+            cx="60"
+            cy="60"
+            r="51"
+            fill="none"
+            stroke={color}
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={`${(score / 100) * 320.44} 320.44`}
+          />
+        </svg>
         <div>
-          <span className="font-semibold text-blue-600">{audit.seo_score}</span> SEO
-        </div>
-        <div>
-          <span className="font-semibold text-emerald-600">{audit.geo_score}</span> GEO
+          <strong>{Number(score.toFixed(1))}</strong>
+          <small>out of 100</small>
         </div>
       </div>
+      <p className="score-caption">{label}</p>
     </div>
-  )
+  );
 }
-
-export default SEOScoreCard
+export default function SEOScoreCard({ audit }: { audit?: Audit }) {
+  return (
+    <div className="panel">
+      <h2 className="panel-title">Latest page snapshot</h2>
+      {audit ? (
+        <>
+          <p className="score-url" title={audit.url}>
+            {audit.url}
+          </p>
+          <div className="score-pair">
+            <Ring value={audit.seo_score} label="SEO score" color="#4f719b" />
+            <Ring value={audit.geo_score} label="GEO score" color="#4a9b80" />
+          </div>
+          <div className="score-footer">
+            <span>{audit.word_count.toLocaleString()} words analyzed</span>
+            <span>{new Date(audit.created_at).toLocaleDateString()}</span>
+          </div>
+        </>
+      ) : (
+        <Empty title="Your first insight is one audit away">
+          Enter a website URL above to see its search and AI readiness scores.
+        </Empty>
+      )}
+    </div>
+  );
+}

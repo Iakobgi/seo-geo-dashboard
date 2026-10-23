@@ -56,12 +56,7 @@ def request_password_reset(req: schemas.PasswordResetRequest, db: Session = Depe
         f"{reset_link}\n\n"
         f"If you didn't request this, you can safely ignore this email.\n"
     )
-    sent = send_report_email(user.email, email_body, subject="Reset your password")
-
-    if not sent:
-        # SMTP not configured or failed — fall back to returning the token for dev/testing
-        generic_response["token"] = reset_token
-        generic_response["note"] = "SMTP not configured — returning token for dev/testing only."
+    send_report_email(user.email, email_body, subject="Reset your password")
 
     return generic_response
 

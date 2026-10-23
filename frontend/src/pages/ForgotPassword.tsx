@@ -1,66 +1,67 @@
-import React, { useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import { authApi } from '../api/endpoints'
-
-const ForgotPassword: React.FC = () => {
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [sent, setSent] = useState(false)
-
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Loader2, Mail } from "lucide-react";
+import { authApi } from "../api/endpoints";
+import { errorMessage } from "../api/helpers";
+import AuthLayout from "../components/AuthLayout";
+import { Notice } from "../components/UI";
+export default function ForgotPassword() {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
     try {
-      await authApi.requestPasswordReset(email)
-      setSent(true)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Something went wrong.')
+      await authApi.requestPasswordReset(email.trim());
+      setSent(true);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
+  };
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
-        <h1 className="text-2xl font-bold mb-1">Reset your password</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Enter your email and we'll send you a link to reset your password.
-        </p>
-
-        {sent ? (
-          <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
-            If an account exists for that email, a reset link has been sent. Check your inbox.
-          </div>
-        ) : (
-          <form onSubmit={submit} className="space-y-4">
+    <AuthLayout>
+      <p className="eyebrow">ACCOUNT RECOVERY</p>
+      <h1>Let’s get you back in.</h1>
+      <p>Enter your email to request a password reset link.</p>
+      {sent ? (
+        <div role="status" className="success-message">
+          If an account exists for that email, we’ll send a reset link. Check
+          your inbox and spam folder. If it doesn’t arrive, contact your
+          workspace administrator.
+        </div>
+      ) : (
+        <form onSubmit={submit}>
+          <label className="field" htmlFor="recovery-email">
+            Email address
             <input
+              id="recovery-email"
               type="email"
+              autoComplete="email"
               required
-              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="you@company.com"
             />
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <button
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              Send reset link
-            </button>
-          </form>
-        )}
-
-        <a href="/login" className="mt-4 block text-sm text-blue-600 hover:underline text-center">
-          Back to login
-        </a>
-      </div>
-    </div>
-  )
+          </label>
+          {error && <Notice>{error}</Notice>}
+          <button disabled={loading} className="button button-dark auth-submit">
+            {loading ? (
+              <Loader2 size={17} className="animate-spin" />
+            ) : (
+              <Mail size={17} />
+            )}
+            Send reset link
+          </button>
+        </form>
+      )}
+      <p className="auth-bottom">
+        <Link to="/login">Back to login</Link>
+      </p>
+    </AuthLayout>
+  );
 }
-
-export default ForgotPassword

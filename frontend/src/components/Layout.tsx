@@ -1,34 +1,111 @@
-import React from 'react'
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Tags, Sparkles, LogOut } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
-
+import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
+import { NavLink, Link, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Search,
+  Tags,
+  Sparkles,
+  LogOut,
+  ListChecks,
+  Menu,
+  X,
+  ArrowUpRight,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { Brand } from "./UI";
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/audits', label: 'Audits', icon: Search },
-  { to: '/keywords', label: 'Keywords', icon: Tags },
-  { to: '/agent', label: 'AI Agent', icon: Sparkles },
-]
-
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout } = useAuth()
-
+  { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { to: "/audits", label: "Website audits", icon: Search },
+  { to: "/keywords", label: "Keyword tracking", icon: Tags },
+  { to: "/recommendations", label: "Recommendations", icon: ListChecks },
+  { to: "/agent", label: "AI workspace", icon: Sparkles },
+];
+export default function Layout({ children }: { children: ReactNode }) {
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
+  useEffect(() => {
+    if (!open || !window.matchMedia("(max-width: 800px)").matches) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    const drawer = document.getElementById("workspace-navigation");
+    const controls = () =>
+      Array.from(
+        drawer?.querySelectorAll<HTMLElement>(
+          "a[href], button:not([disabled])",
+        ) || [],
+      );
+    controls()[0]?.focus();
+    document.body.style.overflow = "hidden";
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = controls();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    window.addEventListener("keydown", trap);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", trap);
+      previous?.focus();
+    };
+  }, [open]);
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-slate-900 text-white flex flex-col">
-        <a href="/" className="text-xl font-bold border-b border-slate-800 block p-6 hover:opacity-80">
-          SEO/GEO AI
-        </a>
-        <nav className="flex-1 p-4 space-y-1">
+    <div className="app-shell">
+      {open && (
+        <button
+          className="sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setOpen(false)}
+        />
+      )}
+      <aside
+        id="workspace-navigation"
+        className={`sidebar ${open ? "is-open" : ""}`}
+      >
+        <div className="sidebar-brand">
+          <Brand light />
+          <button
+            className="mobile-only icon-button"
+            aria-label="Close navigation"
+            onClick={() => setOpen(false)}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="workspace-label">
+          <span className="workspace-avatar">W</span>
+          <div>
+            My workspace<small>SEO & AI visibility</small>
+          </div>
+          <span className="status-dot" />
+        </div>
+        <p className="nav-caption">WORKSPACE</p>
+        <nav aria-label="Workspace">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
-              end={to === '/dashboard'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
-                  isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
-                }`
+                `nav-item ${isActive ? "active" : ""}`
               }
             >
               <Icon size={18} />
@@ -36,19 +113,62 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-slate-800">
-          <div className="text-xs text-slate-400 mb-2 truncate">{user?.email}</div>
+        <div className="sidebar-tip">
+          <Sparkles size={20} />
+          <h3>Build your next advantage.</h3>
+          <p>Turn audit findings into a clear plan with your AI workspace.</p>
+          <Link to="/agent">
+            Explore AI tools <ArrowUpRight size={15} />
+          </Link>
+        </div>
+        <div className="sidebar-user">
+          <span className="user-avatar">
+            {user?.email.charAt(0).toUpperCase()}
+          </span>
+          <div>
+            <strong>Personal account</strong>
+            <small title={user?.email}>{user?.email}</small>
+          </div>
           <button
             onClick={logout}
-            className="flex items-center gap-2 text-sm text-slate-300 hover:text-white"
+            className="icon-button"
+            title="Sign out"
+            aria-label="Sign out"
           >
-            <LogOut size={16} /> Log out
+            <LogOut size={18} />
           </button>
         </div>
       </aside>
-      <main className="flex-1 bg-gray-100 overflow-y-auto">{children}</main>
+      <div className="workspace-main">
+        <header className="workspace-header">
+          <div className="flex items-center gap-3">
+            <button
+              className="mobile-only icon-button"
+              aria-label="Open navigation"
+              aria-expanded={open}
+              aria-controls="workspace-navigation"
+              onClick={() => setOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <span>
+              Workspace <span className="text-gray-300 mx-2">/</span>{" "}
+              <strong>
+                {navItems.find((item) => item.to === location.pathname)?.label}
+              </strong>
+            </span>
+          </div>
+          <Link to="/audits" className="header-link">
+            New audit <ArrowUpRight size={15} />
+          </Link>
+        </header>
+        <main id="main-content" className="workspace-content">
+          {children}
+        </main>
+        <footer className="workspace-footer">
+          SEO/GEO AI <span>Make your next move measurable.</span>
+        </footer>
+      </div>
     </div>
-  )
+  );
 }
-
-export default Layout

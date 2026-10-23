@@ -1,77 +1,148 @@
-import React, { useState } from 'react'
-import { ArrowDown, ArrowUp, Minus, RefreshCw, Trash2 } from 'lucide-react'
-import { keywordsApi, type Keyword } from '../api/endpoints'
-
-interface Props {
-  keywords: Keyword[]
-  onChanged: () => void
-}
-
-const KeywordTracker: React.FC<Props> = ({ keywords, onChanged }) => {
-  const [newKeyword, setNewKeyword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  const addKeyword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newKeyword.trim()) return
-    setSubmitting(true)
+import { useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, Minus, RefreshCw, Trash2 } from "lucide-react";
+import { keywordsApi, type Keyword } from "../api/endpoints";
+import { errorMessage } from "../api/helpers";
+import { Empty, Notice } from "./UI";
+export default function KeywordTracker({
+  keywords,
+  onChanged,
+}: {
+  keywords: Keyword[];
+  onChanged: () => void;
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [simulated, setSimulated] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    keywordsApi
+      .provider()
+      .then((res) => {
+        if (active) setSimulated(res.data.simulated);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const act = async (operation: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
     try {
-      await keywordsApi.create(newKeyword.trim())
-      setNewKeyword('')
-      onChanged()
+      await operation();
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
-      setSubmitting(false)
+      setBusy(false);
     }
-  }
-
-  const trend = (k: Keyword) => {
-    if (k.previous_position == null || k.position == null) return <Minus size={14} className="text-gray-400" />
-    if (k.position < k.previous_position) return <ArrowUp size={14} className="text-emerald-500" />
-    if (k.position > k.previous_position) return <ArrowDown size={14} className="text-red-500" />
-    return <Minus size={14} className="text-gray-400" />
-  }
-
+  };
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = keyword.trim();
+    if (!value) return;
+    if (keywords.some((k) => k.keyword.toLowerCase() === value.toLowerCase())) {
+      setError("You’re already tracking this keyword.");
+      return;
+    }
+    await act(async () => {
+      await keywordsApi.create(value);
+      setKeyword("");
+    });
+  };
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <h2 className="text-lg font-semibold mb-4">Keyword Tracking</h2>
-      <form onSubmit={addKeyword} className="flex gap-2 mb-4">
+    <div className="panel">
+      <h2 className="panel-title">
+        Keyword watchlist{" "}
+        {simulated && <span className="score-badge ml-2">Demo data</span>}
+      </h2>
+      <p className="panel-subtitle">Keep your target search terms in view.</p>
+      <form onSubmit={add} className="flex gap-2 mb-4">
         <input
-          value={newKeyword}
-          onChange={(e) => setNewKeyword(e.target.value)}
-          placeholder="Add a keyword to track..."
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+          maxLength={200}
+          aria-label="New keyword"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="Add a keyword…"
+          className="search-input flex-1"
+          style={{ minWidth: 0 }}
         />
         <button
-          disabled={submitting}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+          disabled={busy || !keyword.trim()}
+          className="button button-dark"
         >
           Add
         </button>
       </form>
-      <div className="space-y-2 max-h-72 overflow-y-auto">
-        {keywords.length === 0 && <p className="text-sm text-gray-500">No keywords tracked yet.</p>}
-        {keywords.map((k) => (
-          <div key={k.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2">
-            <div className="flex items-center gap-2">
-              {trend(k)}
-              <span>{k.keyword}</span>
+      {error && <Notice>{error}</Notice>}
+      {keywords.length > 5 && (
+        <input
+          aria-label="Search keywords"
+          className="search-input w-full mb-3"
+          placeholder="Filter keywords…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      )}
+      <div className="max-h-72 overflow-auto">
+        {keywords.length === 0 && (
+          <Empty title="What do you want to be found for?">
+            Add your first keyword to start building a watchlist.
+          </Empty>
+        )}
+        {keywords.length > 0 &&
+          !keywords.some((k) =>
+            k.keyword.toLowerCase().includes(query.toLowerCase()),
+          ) && <p className="panel-subtitle">No matching keywords.</p>}
+        {keywords
+          .filter((k) => k.keyword.toLowerCase().includes(query.toLowerCase()))
+          .map((k) => (
+            <div
+              key={k.id}
+              className="flex items-center justify-between border-b border-gray-100 py-3 gap-3 text-xs"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {k.previous_position == null ||
+                k.position == null ||
+                k.position === k.previous_position ? (
+                  <Minus size={13} className="shrink-0 text-gray-400" />
+                ) : k.position < k.previous_position ? (
+                  <ArrowUp size={13} className="shrink-0 text-emerald-600" />
+                ) : (
+                  <ArrowDown size={13} className="shrink-0 text-red-500" />
+                )}
+                <span className="break-words">{k.keyword}</span>
+              </div>
+              <div className="flex items-center shrink-0 gap-2">
+                <span className="text-gray-400 text-[10px]">
+                  #{k.position ?? "—"} · Vol.{" "}
+                  {k.volume?.toLocaleString() ?? "—"}
+                </span>
+                <button
+                  disabled={busy}
+                  onClick={() => act(() => keywordsApi.refresh(k.id))}
+                  className="icon-button"
+                  title="Refresh position"
+                  aria-label={`Refresh ${k.keyword}`}
+                >
+                  <RefreshCw size={13} />
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => act(() => keywordsApi.remove(k.id))}
+                  className="icon-button text-gray-400"
+                  title="Remove keyword"
+                  aria-label={`Remove ${k.keyword}`}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-gray-500">
-                Pos. {k.position ?? '—'} · Vol. {k.volume ?? '—'}
-              </span>
-              <button onClick={() => keywordsApi.refresh(k.id).then(onChanged)} title="Refresh position">
-                <RefreshCw size={14} className="text-gray-400 hover:text-blue-600" />
-              </button>
-              <button onClick={() => keywordsApi.remove(k.id).then(onChanged)} title="Remove">
-                <Trash2 size={14} className="text-gray-400 hover:text-red-600" />
-              </button>
-            </div>
-          </div>
-        ))}
+          ))}
       </div>
     </div>
-  )
+  );
 }
-
-export default KeywordTracker

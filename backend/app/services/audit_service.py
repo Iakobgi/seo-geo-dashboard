@@ -2,6 +2,8 @@
 
 from sqlalchemy.orm import Session
 from datetime import datetime
+from bs4 import BeautifulSoup
+import json
 
 from app import models
 from app.services.crawler_service import CrawlerConfig, CrawlerService
@@ -12,6 +14,7 @@ from app.services.schema_analysis_service import SchemaAnalysisService
 from app.services.eeat_analysis_service import EEAATAnalysisService
 from app.services.ai_service import call_openrouter
 from app.services.rag_service import create_rag_service
+from app.config import settings
 
 
 async def perform_audit(url: str, user_id: int, db: Session, model: str = None) -> models.Audit:
@@ -26,6 +29,8 @@ async def perform_audit(url: str, user_id: int, db: Session, model: str = None) 
 
     # Crawl the site
     crawl_result = await crawler.crawl(url)
+    if not crawl_result.pages:
+        raise ValueError("No readable pages were found. Check that the URL is public and allows crawling.")
 
     # Analyze with SEO analysis service
     analysis_service = SEOAnalysisService()
@@ -146,8 +151,21 @@ async def perform_audit(url: str, user_id: int, db: Session, model: str = None) 
     )
     db.add(snapshot)
 
-    # Generate AI recommendations with RAG context (optional)
-    if model:
+    # Actionable findings remain useful even when AI is unavailable.
+    suggestions_seen = set()
+    actionable = sorted(
+        (finding for finding in all_findings if finding.severity.value != "pass"),
+        key=lambda finding: finding.impact_score,
+        reverse=True,
+    )
+    for finding in actionable:
+        suggestion = finding.recommendation.strip()
+        if suggestion and suggestion not in suggestions_seen:
+            suggestions_seen.add(suggestion)
+            db.add(models.Recommendation(audit_id=audit.id, type="suggestion", suggestion=suggestion))
+
+    # Use the configured model by default; an explicit override is optional.
+    if model or settings.OPENROUTER_API_KEY:
         try:
             # Build RAG context from findings
             rag_service = create_rag_service(db)
@@ -158,17 +176,23 @@ async def perform_audit(url: str, user_id: int, db: Session, model: str = None) 
                 "url": url,
                 "title": title,
                 "meta_description": meta_description,
+                "h1": h1,
+                "h2": h2,
+                "word_count": word_count,
+                "content_excerpt": BeautifulSoup(primary_page.html or "", "html.parser").get_text(" ", strip=True)[:3000],
                 "findings": [f.to_dict() for f in all_findings[:20]],  # Limit findings
             }, model, rag_context=rag_context)
 
             for suggestion in ai_result.get("suggestions", []):
-                db.add(models.Recommendation(audit_id=audit.id, type="suggestion", suggestion=suggestion))
+                if suggestion not in suggestions_seen:
+                    suggestions_seen.add(suggestion)
+                    db.add(models.Recommendation(audit_id=audit.id, type="suggestion", suggestion=suggestion))
 
-            if ai_result.get("generated_content"):
+            if ai_result.get("generated_content") and ai_result.get("generation_source") == "openrouter":
                 db.add(models.Recommendation(
                     audit_id=audit.id,
                     type="generated_content",
-                    suggestion=str(ai_result["generated_content"]),
+                    suggestion=json.dumps(ai_result["generated_content"], ensure_ascii=False),
                 ))
         except Exception:
             pass  # Continue even if AI fails
