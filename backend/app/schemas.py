@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -6,7 +6,7 @@ from datetime import datetime
 # ---- Auth ----
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=72)
 
 
 class UserLogin(BaseModel):
@@ -19,8 +19,8 @@ class PasswordResetRequest(BaseModel):
 
 
 class PasswordReset(BaseModel):
-    token: str
-    new_password: str
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=72)
 
 
 class Token(BaseModel):
@@ -146,7 +146,7 @@ class CrawlResultOut(BaseModel):
 
 # ---- Keyword ----
 class KeywordCreate(BaseModel):
-    keyword: str
+    keyword: str = Field(min_length=1, max_length=200)
     audit_id: Optional[int] = None
 
 
@@ -163,7 +163,7 @@ class KeywordOut(BaseModel):
 # ---- Agent ----
 class AgentRequest(BaseModel):
     url: str
-    target_score: int = 90
+    target_score: int = Field(default=90, ge=0, le=100)
     model: Optional[str] = None
 
 
@@ -174,3 +174,5 @@ class AgentResult(BaseModel):
     current_geo_score: float
     actions: List[str] = []
     generated_content: Optional[Dict[str, Any]] = None
+    generation_source: Optional[str] = None
+    generation_message: Optional[str] = None

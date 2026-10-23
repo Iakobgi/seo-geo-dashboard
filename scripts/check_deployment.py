@@ -30,8 +30,8 @@ def check(base_url):
         print(f"OK {path}")
 
 
-def test_auth(base_url):
-    """Use only against a disposable test database; creates a test user."""
+def test_auth(base_url, cleanup=False):
+    """Exercise real authentication; optionally remove only the generated smoke-test user."""
     payload = {"email": f"proxy-{uuid.uuid4().hex}@example.com", "password": "TestPass123!"}
 
     def request(path, data=None, token=None):
@@ -46,13 +46,27 @@ def test_auth(base_url):
         with urlopen(req, timeout=10) as response:
             return json.load(response)
 
-    assert request("/auth/register", payload)["email"] == payload["email"]
-    token = request("/auth/login", payload)["access_token"]
-    assert request("/auth/me", token=token)["email"] == payload["email"]
-    print("OK register, login, and authenticated profile through proxy")
+    try:
+        assert request("/auth/register", payload)["email"] == payload["email"]
+        token = request("/auth/login", payload)["access_token"]
+        assert request("/auth/me", token=token)["email"] == payload["email"]
+        assert request("/audits/", token=token) == []
+        assert request("/keywords/", token=token) == []
+        print("OK register, login, profile, audits, and keywords through proxy")
+    finally:
+        if cleanup:
+            # Run from backend/ with its environment; never match a real account.
+            from app.database import SessionLocal
+            from app.models import User
+            with SessionLocal() as db:
+                user = db.query(User).filter(User.email == payload["email"]).first()
+                if user:
+                    db.delete(user)
+                    db.commit()
+            print("OK temporary smoke-test account removed")
 
 
 if __name__ == "__main__":
     check(sys.argv[1])
     if "--test-auth" in sys.argv[2:]:
-        test_auth(sys.argv[1])
+        test_auth(sys.argv[1], cleanup="--cleanup-auth" in sys.argv[2:])

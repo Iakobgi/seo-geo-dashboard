@@ -1,49 +1,72 @@
-import React, { useState } from 'react'
-import { Loader2, Search } from 'lucide-react'
-import { auditsApi } from '../api/endpoints'
-
-const AuditForm: React.FC<{ onCreated: () => void }> = ({ onCreated }) => {
-  const [url, setUrl] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+import { useState } from "react";
+import { Loader2, ArrowUpRight } from "lucide-react";
+import { auditsApi } from "../api/endpoints";
+import { normalizeUrl, errorMessage } from "../api/helpers";
+import { Notice } from "./UI";
+export default function AuditForm({ onCreated }: { onCreated: () => void }) {
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!url.trim()) return
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setError(null);
+    let normalized: string;
     try {
-      await auditsApi.create(url.trim())
-      setUrl('')
-      onCreated()
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to audit this URL.')
-    } finally {
-      setLoading(false)
+      normalized = normalizeUrl(url);
+    } catch {
+      setError(
+        "Enter a valid website, such as example.com or https://example.com.",
+      );
+      return;
     }
-  }
-
+    setLoading(true);
+    try {
+      await auditsApi.create(normalized);
+      setUrl("");
+      onCreated();
+    } catch (err) {
+      setError(
+        errorMessage(err, "Unable to audit this page. Please try another URL."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
-    <form onSubmit={submit} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <h2 className="text-lg font-semibold mb-3">Run a new audit</h2>
-      <div className="flex gap-2">
+    <form onSubmit={submit} className="panel audit-form">
+      <div>
+        <h2 className="panel-title">Your next insight starts here.</h2>
+        <p>Analyze a page for search and AI readiness.</p>
+      </div>
+      <div className="audit-input-row">
+        <label htmlFor="audit-url" className="sr-only">
+          Website URL
+        </label>
         <input
+          id="audit-url"
+          required
+          disabled={loading}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://yourwebsite.com"
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Enter your website URL"
+          autoComplete="url"
         />
-        <button
-          disabled={loading}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-          Analyze
+        <button disabled={loading} className="button button-dark">
+          {loading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <ArrowUpRight size={16} />
+          )}
+          {loading ? "Analyzing…" : "Run audit"}
         </button>
       </div>
-      {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+      {loading && (
+        <div className="audit-progress" role="status">
+          Reading page content and generating recommendations. This may take a
+          minute.
+        </div>
+      )}
+      {error && <Notice>{error}</Notice>}
     </form>
-  )
+  );
 }
-
-export default AuditForm

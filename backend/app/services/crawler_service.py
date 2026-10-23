@@ -9,6 +9,12 @@ from urllib.parse import urljoin, urlparse, urlunparse
 from urllib import robotparser
 import httpx
 from bs4 import BeautifulSoup
+from app.utils.security import validate_url
+
+
+async def validate_crawl_request(request: httpx.Request):
+    # HTTPX invokes this hook again for each redirect destination.
+    await asyncio.to_thread(validate_url, str(request.url))
 
 
 @dataclass
@@ -114,7 +120,7 @@ class CrawlerService:
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
 
         try:
-            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True, event_hooks={"request": [validate_crawl_request]}) as client:
                 resp = await client.get(robots_url, headers={"User-Agent": self.config.user_agent})
                 if resp.status_code == 200:
                     self._robots_parser = robotparser.RobotFileParser()
@@ -138,7 +144,7 @@ class CrawlerService:
 
         # Check common sitemap locations
         common_paths = ["/sitemap.xml", "/sitemap_index.xml"]
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True, event_hooks={"request": [validate_crawl_request]}) as client:
             for path in common_paths:
                 sitemap_url = f"{parsed.scheme}://{parsed.netloc}{path}"
                 try:
@@ -249,7 +255,8 @@ class CrawlerService:
             async with httpx.AsyncClient(
                 timeout=self.config.timeout,
                 follow_redirects=self.config.follow_redirects,
-                headers={"User-Agent": self.config.user_agent}
+                headers={"User-Agent": self.config.user_agent},
+                event_hooks={"request": [validate_crawl_request]},
             ) as client:
                 resp = await client.get(url)
                 load_time = time.time() - start
@@ -290,6 +297,7 @@ class CrawlerService:
 
     async def crawl(self, start_url: str) -> CrawlResult:
         """Perform a multi-page crawl starting from the given URL."""
+        start_url = await asyncio.to_thread(validate_url, start_url)
         start_time = time.time()
         result = CrawlResult(start_url=start_url)
 

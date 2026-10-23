@@ -27,3 +27,7 @@ dist/
 
 # Logs
 *.log
+
+# Local deployment state and permission backups (never publish)
+.deployment/
+.backups/

@@ -28,59 +28,36 @@ CLOUD_METADATA_PATTERNS = [
 
 
 def is_safe_url(url: str) -> bool:
-    """Validate URL is safe to fetch (no SSRF).
+    """Reject non-HTTP URLs, credentials, and non-public IPv4/IPv6 destinations."""
+    import ipaddress
+    import socket
 
-    Checks:
-    - Scheme is http or https
-    - Host resolves to a public IP
-    - Host is not a private/reserved range
-    - Host is not a cloud metadata endpoint
-    """
-    parsed = urlparse(url)
-
-    # Only allow http and https
-    if parsed.scheme not in ("http", "https"):
+    if not isinstance(url, str) or not url:
         return False
-
-    host = parsed.hostname
-    if not host:
-        return False
-
-    # Block localhost variants
-    if host in ("localhost", "0.0.0.0", "::1"):
-        return False
-
-    # Check against cloud metadata patterns
-    for pattern in CLOUD_METADATA_PATTERNS:
-        if re.search(pattern, host, re.I):
-            return False
-
-    # Try to resolve and check IP ranges
     try:
-        ip = netaddr.IPAddress(host)
-        for private_range in PRIVATE_RANGES:
-            if ip in private_range:
-                return False
-    except netaddr.AddrFormatError:
-        # Could not parse as IP — might be a valid hostname
-        # Do a DNS lookup to check
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        host = parsed.hostname
+        port = parsed.port
+        if host.lower() == "localhost" or any(re.search(pattern, host, re.I) for pattern in CLOUD_METADATA_PATTERNS):
+            return False
         try:
-            import socket
-            addr_info = socket.getaddrinfo(host, None, socket.AF_INET)
-            for info in addr_info:
-                ip_str = info[4][0]
-                try:
-                    ip = netaddr.IPAddress(ip_str)
-                    for private_range in PRIVATE_RANGES:
-                        if ip in private_range:
-                            return False
-                except netaddr.AddrFormatError:
-                    continue
-        except socket.gaierror:
-            # DNS resolution failed — allow it (might be a valid private hostname)
-            pass
-
-    return True
+            addresses = [ipaddress.ip_address(host)]
+        except ValueError:
+            addresses = [ipaddress.ip_address(info[4][0]) for info in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
+        if not addresses:
+            return False
+        for address in addresses:
+            if address.version == 6 and address.ipv4_mapped:
+                address = address.ipv4_mapped
+            if not address.is_global or address.is_multicast:
+                return False
+        return True
+    except (ValueError, OSError):
+        return False
 
 
 def validate_url(url: str) -> str:

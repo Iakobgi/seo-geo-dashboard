@@ -1,48 +1,68 @@
-import React, { useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
-import { agentApi, type AgentResult } from '../api/endpoints'
+import React, { useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
+import { agentApi, type AgentResult } from "../api/endpoints";
+import { normalizeUrl, errorMessage, downloadFile } from "../api/helpers";
 
 const AgentPanel: React.FC = () => {
-  const [url, setUrl] = useState('')
-  const [targetScore, setTargetScore] = useState(90)
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<AgentResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [url, setUrl] = useState("");
+  const [targetScore, setTargetScore] = useState(90);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AgentResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const runAgent = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!url.trim()) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
+    e.preventDefault();
+    if (!url.trim()) return;
+    let normalized: string;
     try {
-      const res = await agentApi.run(url.trim(), targetScore)
-      setResult(res.data)
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Agent run failed.')
-    } finally {
-      setLoading(false)
+      normalized = normalizeUrl(url);
+    } catch {
+      setError("Enter a valid public website URL.");
+      return;
     }
-  }
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await agentApi.run(normalized, targetScore);
+      setResult(res.data);
+    } catch (err) {
+      setError(errorMessage(err, "Agent run failed. Please try again."));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="text-purple-600" size={20} />
-        <h2 className="text-lg font-semibold">AI Agent — Auto-Optimize</h2>
+        <h2 className="text-lg font-semibold">
+          Your AI optimization workspace
+        </h2>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        Give the agent a URL and a target SEO score. It audits the page, then generates a prioritized
-        action plan and rewritten on-page content (title, meta, H1, FAQ, JSON-LD schema).
+        Give the agent a URL and a target SEO score. It audits the page, then
+        generates a prioritized action plan and rewritten on-page content
+        (title, meta, H1, FAQ, JSON-LD schema).
       </p>
-      <form onSubmit={runAgent} className="flex flex-col sm:flex-row gap-2 mb-4">
+      <form
+        onSubmit={runAgent}
+        className="flex flex-col sm:flex-row gap-2 mb-4"
+      >
         <input
+          aria-label="Website URL for optimization"
+          required
+          disabled={loading}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://yourwebsite.com"
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
         <input
+          aria-label="Target SEO score"
+          required
+          disabled={loading}
           type="number"
           min={0}
           max={100}
@@ -54,24 +74,67 @@ const AgentPanel: React.FC = () => {
           disabled={loading}
           className="flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50"
         >
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          Optimize automatically
+          {loading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Sparkles size={16} />
+          )}
+          Generate a plan
         </button>
       </form>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {loading && (
+        <p role="status" className="text-xs text-gray-500">
+          Analyzing the page and drafting your plan. This may take a minute.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       {result && (
         <div className="mt-4 border-t border-gray-100 pt-4 space-y-4">
+          {result.generation_message && (
+            <p role="status" className="notice">
+              {result.generation_message}
+            </p>
+          )}
+          {result.generation_source === "openrouter" && (
+            <p className="success-message">
+              AI draft generated successfully. Review it before publishing.
+            </p>
+          )}
+          <button
+            className="button button-secondary"
+            onClick={() =>
+              downloadFile(
+                `optimization-${result.audit_id}.json`,
+                JSON.stringify(result, null, 2),
+              )
+            }
+          >
+            Download optimization plan
+          </button>
           <div className="flex gap-6 text-sm">
             <div>
-              Status: <span className="font-semibold">{result.status.replace('_', ' ')}</span>
+              Status:{" "}
+              <span className="font-semibold">
+                {result.status.replace(/_/g, " ")}
+              </span>
             </div>
             <div>
-              SEO: <span className="font-semibold text-blue-600">{result.current_seo_score}</span>
+              SEO:{" "}
+              <span className="font-semibold text-blue-600">
+                {result.current_seo_score}
+              </span>
             </div>
             <div>
-              GEO: <span className="font-semibold text-emerald-600">{result.current_geo_score}</span>
+              GEO:{" "}
+              <span className="font-semibold text-emerald-600">
+                {result.current_geo_score}
+              </span>
             </div>
           </div>
 
@@ -97,7 +160,7 @@ const AgentPanel: React.FC = () => {
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default AgentPanel
+export default AgentPanel;

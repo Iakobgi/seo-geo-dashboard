@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,7 +18,10 @@ async def run_agent(
     user: models.User = Depends(get_current_user),
 ):
     # 1. Run a full audit (scrape + AI analysis), same as a normal audit.
-    audit = await perform_audit(request.url, user.id, db, request.model)
+    try:
+        audit = await perform_audit(request.url, user.id, db, request.model)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if audit.seo_score >= request.target_score:
         return schemas.AgentResult(
@@ -30,6 +34,8 @@ async def run_agent(
 
     # 2. Ask the AI for a prioritized action plan + rewritten on-page content.
     scrape_like_payload = {
+        "url": audit.url,
+        "content_excerpt": BeautifulSoup(audit.raw_html or "", "html.parser").get_text(" ", strip=True)[:3000],
         "title": audit.title,
         "meta_description": audit.meta_description,
         "h1": audit.h1,
@@ -44,10 +50,12 @@ async def run_agent(
     ai_result = await call_openrouter(scrape_like_payload, request.model)
 
     return schemas.AgentResult(
-        status="plan_generated",
+        status="plan_generated" if ai_result.get("generation_source") == "openrouter" else "guidance_generated",
         audit_id=audit.id,
         current_seo_score=audit.seo_score,
         current_geo_score=audit.geo_score,
         actions=ai_result.get("suggestions", []),
         generated_content=ai_result.get("generated_content"),
+        generation_source=ai_result.get("generation_source"),
+        generation_message=ai_result.get("generation_message"),
     )
