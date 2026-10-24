@@ -24,13 +24,13 @@ export default function Recommendations() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Turn insight into improvement."
+        title="Page recommendations"
         description="Work through your page recommendations and keep track of what you’ve applied."
       />
       {error && <Notice retry={refresh}>{error}</Notice>}
       {audits.length === 0 && (
         <div className="panel">
-          <Empty title="Your next steps will appear here">
+          <Empty title="No recommendations yet">
             Run a website audit to generate recommendations for your page.
           </Empty>
         </div>

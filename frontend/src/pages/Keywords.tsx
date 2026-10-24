@@ -33,7 +33,7 @@ export default function Keywords() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Keep your keywords in focus."
+        title="Keyword tracking"
         description="Build your watchlist and review changes in position and search volume."
       />
       {error && <Notice retry={refresh}>{error}</Notice>}

@@ -56,8 +56,8 @@ export default function SEOScoreCard({ audit }: { audit?: Audit }) {
             {audit.url}
           </p>
           <div className="score-pair">
-            <Ring value={audit.seo_score} label="SEO score" color="#4f719b" />
-            <Ring value={audit.geo_score} label="GEO score" color="#4a9b80" />
+            <Ring value={audit.seo_score} label="SEO score" color="#397ee2" />
+            <Ring value={audit.geo_score} label="GEO score" color="#38a5dd" />
           </div>
           <div className="score-footer">
             <span>{audit.word_count.toLocaleString()} words analyzed</span>
@@ -65,7 +65,7 @@ export default function SEOScoreCard({ audit }: { audit?: Audit }) {
           </div>
         </>
       ) : (
-        <Empty title="Your first insight is one audit away">
+        <Empty title="No audit results yet">
           Enter a website URL above to see its search and AI readiness scores.
         </Empty>
       )}

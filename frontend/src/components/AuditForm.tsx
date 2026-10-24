@@ -35,7 +35,7 @@ export default function AuditForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form onSubmit={submit} className="panel audit-form">
       <div>
-        <h2 className="panel-title">Your next insight starts here.</h2>
+        <h2 className="panel-title">Analyze a website page</h2>
         <p>Analyze a page for search and AI readiness.</p>
       </div>
       <div className="audit-input-row">

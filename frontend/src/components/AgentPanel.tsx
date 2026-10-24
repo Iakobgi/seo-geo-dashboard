@@ -132,7 +132,7 @@ const AgentPanel: React.FC = () => {
             </div>
             <div>
               GEO:{" "}
-              <span className="font-semibold text-emerald-600">
+              <span className="font-semibold text-blue-600">
                 {result.current_geo_score}
               </span>
             </div>

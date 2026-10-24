@@ -89,7 +89,7 @@ export default function KeywordTracker({
       )}
       <div className="max-h-72 overflow-auto">
         {keywords.length === 0 && (
-          <Empty title="What do you want to be found for?">
+          <Empty title="No keywords added yet">
             Add your first keyword to start building a watchlist.
           </Empty>
         )}
@@ -110,7 +110,7 @@ export default function KeywordTracker({
                 k.position === k.previous_position ? (
                   <Minus size={13} className="shrink-0 text-gray-400" />
                 ) : k.position < k.previous_position ? (
-                  <ArrowUp size={13} className="shrink-0 text-emerald-600" />
+                  <ArrowUp size={13} className="shrink-0 text-blue-600" />
                 ) : (
                   <ArrowDown size={13} className="shrink-0 text-red-500" />
                 )}

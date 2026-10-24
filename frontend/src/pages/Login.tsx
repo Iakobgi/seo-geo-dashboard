@@ -65,11 +65,11 @@ export default function Login() {
           Create account
         </button>
       </div>
-      <h1>{mode === "login" ? "Welcome back." : "Start seeing clearly."}</h1>
+      <h1>{mode === "login" ? "Sign in" : "Create an account"}</h1>
       <p>
         {mode === "login"
-          ? "Your next opportunity is waiting in your workspace."
-          : "Create your workspace and find your first opportunity."}
+          ? "Access your website audits, keywords, and recommendations."
+          : "Create an account to audit and manage your website pages."}
       </p>
       {params.has("expired") && (
         <Notice>Your session ended. Please sign in again.</Notice>
@@ -152,7 +152,7 @@ export default function Login() {
         </fieldset>
       </form>
       <p className="auth-bottom">
-        SEO insights. AI readiness. One place to move forward.
+        Website audits · SEO analysis · AI readiness
       </p>
     </AuthLayout>
   );

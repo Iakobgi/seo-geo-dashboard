@@ -26,7 +26,7 @@ export default function ForgotPassword() {
   return (
     <AuthLayout>
       <p className="eyebrow">ACCOUNT RECOVERY</p>
-      <h1>Let’s get you back in.</h1>
+      <h1>Reset your password</h1>
       <p>Enter your email to request a password reset link.</p>
       {sent ? (
         <div role="status" className="success-message">
