@@ -34,7 +34,7 @@ export default function RecommendationList({
     <div className="panel">
       <div className="table-toolbar">
         <div>
-          <h2 className="panel-title">Your next steps</h2>
+          <h2 className="panel-title">Audit recommendations</h2>
           <p className="panel-subtitle mb-0">
             Mark improvements as applied after updating your website.
           </p>
@@ -58,7 +58,7 @@ export default function RecommendationList({
           title={
             suggestions.length
               ? "Nothing in this view"
-              : "Good decisions start with an audit"
+              : "No page recommendations yet"
           }
         >
           {suggestions.length
@@ -72,7 +72,7 @@ export default function RecommendationList({
             <div className="flex gap-3 items-start">
               <Circle
                 size={12}
-                className={`shrink-0 mt-1 ${rec.status === "applied" ? "text-emerald-600" : "text-gray-400"}`}
+                className={`shrink-0 mt-1 ${rec.status === "applied" ? "text-blue-600" : "text-gray-400"}`}
               />
               <div>
                 <p
@@ -89,7 +89,7 @@ export default function RecommendationList({
               <div className="flex shrink-0">
                 <button
                   disabled={busy !== null}
-                  className="icon-button text-emerald-600"
+                  className="icon-button text-blue-600"
                   onClick={() => handle(rec.id, "apply")}
                   title="Mark as applied"
                   aria-label="Mark recommendation as applied"

@@ -1,12 +1,14 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import "./home-hero.css";
 import {
   ArrowRight,
   ArrowUpRight,
   Search,
   Sparkles,
   ScanLine,
-  Check,
-  Globe2,
+  Menu,
+  X,
   ChartNoAxesCombined,
   ListChecks,
 } from "lucide-react";
@@ -15,165 +17,97 @@ import { useAuth } from "../contexts/AuthContext";
 export default function Home() {
   const { user } = useAuth();
   const start = user ? "/dashboard" : "/login?mode=register";
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        document.getElementById("home-menu-toggle")?.focus();
+      }
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menuOpen]);
+
   return (
     <div className="marketing">
-      <nav className="marketing-nav">
-        <Brand />
-        <div className="marketing-links">
-          <a href="#features">Platform</a>
-          <a href="#workflow">How it works</a>
-        </div>
-        <div className="flex items-center gap-5">
-          <Link className="login-link" to={user ? "/dashboard" : "/login"}>
-            {user ? "Dashboard" : "Log in"}
-          </Link>
-          <Link className="button button-dark" to={start}>
-            Get started <ArrowUpRight size={16} />
-          </Link>
-        </div>
-      </nav>
       <main id="main-content">
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="hero-badge">
-              <span className="status-dot" /> Built for the next era of search
+        <section className="film-hero" aria-labelledby="home-hero-title">
+          <div className="film-media" aria-hidden="true" />
+          <img
+            className="film-visual"
+            src="/media/website-overview.svg"
+            alt="Example website layout with page content, metadata, structured data, and an illustrative audit history graph."
+          />
+          <div className="film-shade" aria-hidden="true" />
+          <nav className="film-nav" aria-label="Main navigation">
+            <Brand light />
+            <div className="film-nav-links">
+              <a href="#features">The platform</a>
+              <a href="#workflow">How it works</a>
             </div>
-            <h1>
-              Be found.
+            <div className="film-nav-actions">
+              <Link to={user ? "/dashboard" : "/login"}>
+                {user ? "Dashboard" : "Log in"}
+              </Link>
+              <Link className="film-nav-cta" to={start}>
+                Get started <ArrowUpRight size={15} />
+              </Link>
+            </div>
+            <button
+              id="home-menu-toggle"
+              type="button"
+              className="film-menu-toggle"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              aria-controls="home-mobile-menu"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+              <span>{menuOpen ? "Close" : "Menu"}</span>
+            </button>
+            {menuOpen && (
+              <div className="film-mobile-menu" id="home-mobile-menu">
+                <a href="#features" onClick={() => setMenuOpen(false)}>
+                  The platform <ArrowUpRight size={17} />
+                </a>
+                <a href="#workflow" onClick={() => setMenuOpen(false)}>
+                  How it works <ArrowUpRight size={17} />
+                </a>
+                <Link to={user ? "/dashboard" : "/login"}>
+                  {user ? "Dashboard" : "Log in"}
+                  <ArrowUpRight size={17} />
+                </Link>
+                <Link to={start} className="film-mobile-start">
+                  Get started <ArrowRight size={17} />
+                </Link>
+              </div>
+            )}
+          </nav>
+          <div className="film-content">
+            <h1 id="home-hero-title">
+              SEO &amp; GEO
               <br />
-              Be the <span>answer.</span>
+              <span>Website analysis.</span>
             </h1>
             <p>
-              Search is changing. Make your website easier to discover in search
-              engines and easier to understand by AI.
+              Audit your pages, review SEO and AI readiness scores, and get
+              practical recommendations for your website.
             </p>
-            <div className="hero-actions">
-              <Link className="button button-dark" to={start}>
-                Find your opportunities <ArrowRight size={18} />
+            <div className="film-actions">
+              <Link className="film-button film-button-primary" to={start}>
+                Run an audit <ArrowUpRight size={17} />
               </Link>
-              <a href="#workflow" className="text-link">
-                See how it works <ArrowUpRight size={16} />
+              <a className="film-button film-button-secondary" href="#features">
+                View features <ArrowRight size={17} />
               </a>
-            </div>
-            <div className="hero-notes">
-              <span>
-                <Check size={15} /> SEO + GEO in one workspace
-              </span>
-              <span>
-                <Check size={15} /> Actionable page insights
-              </span>
-            </div>
-          </div>
-          <div className="hero-visual" aria-label="Illustrative audit preview">
-            <div className="preview-window">
-              <div className="preview-toolbar">
-                <span className="flex gap-1.5">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span>Website visibility / Overview</span>
-                <span className="preview-label">EXAMPLE</span>
-              </div>
-              <div className="preview-body">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="eyebrow">YOUR NEXT OPPORTUNITY</p>
-                    <h3>A clearer path to visibility.</h3>
-                  </div>
-                  <span className="preview-orbit">
-                    <Globe2 size={24} />
-                  </span>
-                </div>
-                <div className="preview-scores">
-                  <div>
-                    <span>Search readiness</span>
-                    <strong>
-                      84<small>/100</small>
-                    </strong>
-                    <div className="preview-bar">
-                      <i style={{ width: "84%" }} />
-                    </div>
-                    <p>SEO score</p>
-                  </div>
-                  <div>
-                    <span>AI readiness</span>
-                    <strong>
-                      72<small>/100</small>
-                    </strong>
-                    <div className="preview-bar mint">
-                      <i style={{ width: "72%" }} />
-                    </div>
-                    <p>GEO score</p>
-                  </div>
-                </div>
-                <div className="preview-chart">
-                  <div className="flex justify-between">
-                    <strong>Small changes. Clear progress.</strong>
-                    <span>Illustrative data</span>
-                  </div>
-                  <svg
-                    viewBox="0 0 420 100"
-                    role="img"
-                    aria-label="Illustrative upward score trend"
-                  >
-                    <defs>
-                      <linearGradient
-                        id="chart-fill"
-                        x1="0"
-                        x2="0"
-                        y1="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="#52d6b0"
-                          stopOpacity=".25"
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="#52d6b0"
-                          stopOpacity="0"
-                        />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M0 85 L60 73 L120 78 L180 45 L240 52 L300 28 L360 34 L420 8 L420 100 L0 100Z"
-                      fill="url(#chart-fill)"
-                    />
-                    <path
-                      d="M0 85 L60 73 L120 78 L180 45 L240 52 L300 28 L360 34 L420 8"
-                      fill="none"
-                      stroke="#45b997"
-                      strokeWidth="3"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div className="preview-finding">
-                  <span>
-                    <Sparkles size={18} />
-                  </span>
-                  <div>
-                    <strong>Make your content answer-ready</strong>
-                    <p>Add clear answers and structured page information.</p>
-                  </div>
-                  <ArrowUpRight size={18} />
-                </div>
-              </div>
-            </div>
-            <div className="floating-note">
-              <span>
-                <Check size={18} />
-              </span>
-              <div>
-                Less guesswork.<strong>More direction.</strong>
-              </div>
             </div>
           </div>
         </section>
         <div className="platform-strip">
-          <span>ONE WORKSPACE. A WIDER VIEW.</span>
+          <span>WEBSITE OPTIMIZATION</span>
           <strong>
             Traditional search <Search size={18} />
           </strong>
@@ -181,19 +115,15 @@ export default function Home() {
           <strong>
             AI answer engines <Sparkles size={18} />
           </strong>
-          <span className="strip-end">Built to help you improve both.</span>
+          <span className="strip-end">SEO and GEO in one dashboard.</span>
         </div>
         <section id="features" className="feature-section">
           <div className="section-intro">
-            <p className="eyebrow">FROM INSIGHT TO ACTION</p>
-            <h2>
-              Know what’s working.
-              <br />
-              See what’s next.
-            </h2>
+            <p className="eyebrow">PLATFORM FEATURES</p>
+            <h2>Website audits and recommendations.</h2>
             <p>
-              Connect the dots between your content, search performance, and AI
-              readiness.
+              Review page content, track audit scores, and manage improvements
+              from one workspace.
             </p>
           </div>
           <div className="feature-grid">
@@ -201,19 +131,19 @@ export default function Home() {
               {
                 icon: ScanLine,
                 tag: "01 / DIAGNOSE",
-                title: "See the full picture.",
+                title: "SEO & GEO audits",
                 text: "Audit titles, metadata, content, and page structure. Get separate SEO and GEO scores with concrete recommendations.",
               },
               {
                 icon: ChartNoAxesCombined,
                 tag: "02 / TRACK",
-                title: "Keep progress in view.",
+                title: "Progress tracking",
                 text: "Compare repeat audits, organize your keyword watchlist, and see how your page scores change over time.",
               },
               {
                 icon: ListChecks,
                 tag: "03 / IMPROVE",
-                title: "Make your next move.",
+                title: "Content recommendations",
                 text: "Work through recommendations and generate draft titles, descriptions, FAQs, and structured data with AI.",
               },
             ].map(({ icon: Icon, tag, title, text }) => (
@@ -228,14 +158,14 @@ export default function Home() {
         </section>
         <section id="workflow" className="workflow-section">
           <div>
-            <p className="eyebrow">A SIMPLE WAY FORWARD</p>
+            <p className="eyebrow">HOW IT WORKS</p>
             <h2>
-              Your website.
+              Analyze. Improve.
               <br />
-              Your next chapter.
+              Measure.
             </h2>
             <Link className="button button-mint" to={start}>
-              Start your first audit <ArrowRight size={18} />
+              Run an audit <ArrowRight size={18} />
             </Link>
           </div>
           <ol>
@@ -245,7 +175,7 @@ export default function Home() {
                 "Enter a public page URL. We’ll examine its content and structure.",
               ],
               [
-                "Understand the gaps",
+                "Review the results",
                 "Review your SEO and GEO scores, page details, and recommended improvements.",
               ],
               [
@@ -266,7 +196,7 @@ export default function Home() {
       </main>
       <footer className="marketing-footer">
         <Brand />
-        <p>Better content. Greater discoverability.</p>
+        <p>Website audits, SEO and GEO analysis.</p>
         <span>© {new Date().getFullYear()} SEO/GEO AI</span>
       </footer>
     </div>

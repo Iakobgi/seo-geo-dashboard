@@ -85,15 +85,15 @@ export default function Dashboard() {
     {
       label: "Open recommendations",
       value: pending,
-      note: "Opportunities to work through",
+      note: "Pending page improvements",
       icon: ListChecks,
     },
   ];
   return (
     <div className="space-y-6">
       <PageHeading
-        title="A clearer view. A smarter next move."
-        description="Your search performance and AI readiness, together in one place."
+        title="Workspace overview"
+        description="Review your audit scores, keyword watchlist, and page recommendations."
         action={
           <Link to="/audits" className="button button-secondary">
             View all audits <ArrowUpRight size={15} />
@@ -139,7 +139,7 @@ export default function Dashboard() {
             )}
           </div>
           {history.length === 0 ? (
-            <Empty title="Watch your progress take shape">
+            <Empty title="No audit history yet">
               Run an audit to begin. Re-audit the same page after making
               improvements.
             </Empty>
@@ -153,11 +153,11 @@ export default function Dashboard() {
                   <CartesianGrid
                     strokeDasharray="3 5"
                     vertical={false}
-                    stroke="#e9efed"
+                    stroke="#e6edf7"
                   />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 9, fill: "#91a19c" }}
+                    tick={{ fontSize: 9, fill: "#8293ac" }}
                     tickFormatter={(value) => value.split(",")[0]}
                     axisLine={false}
                     tickLine={false}
@@ -165,7 +165,7 @@ export default function Dashboard() {
                   />
                   <YAxis
                     domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: "#91a19c" }}
+                    tick={{ fontSize: 10, fill: "#8293ac" }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -183,7 +183,7 @@ export default function Dashboard() {
                   <Line
                     type="monotone"
                     dataKey="seo"
-                    stroke="#4f719b"
+                    stroke="#397ee2"
                     strokeWidth={2.5}
                     name="SEO"
                     dot={{ r: 4 }}
@@ -191,7 +191,7 @@ export default function Dashboard() {
                   <Line
                     type="monotone"
                     dataKey="geo"
-                    stroke="#4a9b80"
+                    stroke="#38a5dd"
                     strokeWidth={2.5}
                     name="GEO"
                     dot={{ r: 4 }}

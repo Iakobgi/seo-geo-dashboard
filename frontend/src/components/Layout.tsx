@@ -115,8 +115,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         </nav>
         <div className="sidebar-tip">
           <Sparkles size={20} />
-          <h3>Build your next advantage.</h3>
-          <p>Turn audit findings into a clear plan with your AI workspace.</p>
+          <h3>AI content tools</h3>
+          <p>Generate plans, page titles, descriptions, and structured data.</p>
           <Link to="/agent">
             Explore AI tools <ArrowUpRight size={15} />
           </Link>
@@ -166,7 +166,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {children}
         </main>
         <footer className="workspace-footer">
-          SEO/GEO AI <span>Make your next move measurable.</span>
+          SEO/GEO AI <span>Website audits · SEO & GEO analysis</span>
         </footer>
       </div>
     </div>

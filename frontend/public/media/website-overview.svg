@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="520" viewBox="0 0 780 520" fill="none">
+<defs>
+<linearGradient id="page" x1="110" y1="70" x2="590" y2="460" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#eaf1fc"/></linearGradient>
+<linearGradient id="area" x1="570" y1="340" x2="570" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#559dff" stop-opacity=".3"/><stop offset="1" stop-color="#559dff" stop-opacity="0"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000b21" flood-opacity=".35"/></filter>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif">
+<g filter="url(#shadow)">
+<rect x="56" y="61" width="566" height="393" rx="16" fill="url(#page)"/>
+<path d="M72 61H606C615 61 622 68 622 77V102H56V77C56 68 63 61 72 61Z" fill="#e3ebf7"/>
+<g fill="#a1b4ce"><circle cx="75" cy="82" r="3"/><circle cx="87" cy="82" r="3"/><circle cx="99" cy="82" r="3"/></g>
+<rect x="173" y="72" width="303" height="20" rx="5" fill="#f6f9fe"/><text x="325" y="86" text-anchor="middle" fill="#7a8da8" font-size="10">website.example</text>
+<rect x="80" y="123" width="24" height="24" rx="6" fill="#397ee2"/><path d="M86 139L91 131L95 136L99 129" stroke="#dcecff" stroke-width="2"/>
+<text x="113" y="140" fill="#27476e" font-size="13" font-weight="600">Website</text><text x="382" y="139" fill="#7186a1" font-size="10">Overview</text><text x="446" y="139" fill="#7186a1" font-size="10">Resources</text><rect x="522" y="127" width="74" height="18" rx="5" fill="#d8e8ff"/>
+<rect x="80" y="167" width="518" height="153" rx="10" fill="#e2edff"/><text x="101" y="193" fill="#4a7dbd" font-size="9" letter-spacing="1.2">PAGE CONTENT</text><text x="101" y="223" fill="#244b7e" font-size="24" font-weight="600">Website overview</text><text x="102" y="247" fill="#6a83a4" font-size="11">Clear headings. Useful content. Structured information.</text>
+<rect x="102" y="267" width="94" height="28" rx="6" fill="#397ee2"/><text x="119" y="285" fill="white" font-size="10">View details</text>
+<rect x="454" y="190" width="120" height="107" rx="9" fill="#cddff9"/><rect x="473" y="253" width="16" height="25" rx="3" fill="#94bbf3"/><rect x="499" y="233" width="16" height="45" rx="3" fill="#649eef"/><rect x="525" y="211" width="16" height="67" rx="3" fill="#397ee2"/>
+<g fill="white" stroke="#dae4f2"><rect x="80" y="337" width="160" height="91" rx="9"/><rect x="250" y="337" width="160" height="91" rx="9"/><rect x="420" y="337" width="178" height="91" rx="9"/></g>
+<g fill="#2b4f7e" font-size="11" font-weight="600"><text x="95" y="361">Page headings</text><text x="265" y="361">Search metadata</text><text x="435" y="361">Structured data</text></g>
+<g fill="#dce6f4"><rect x="95" y="378" width="121" height="4" rx="2"/><rect x="95" y="390" width="99" height="4" rx="2"/><rect x="265" y="378" width="120" height="4" rx="2"/><rect x="265" y="390" width="89" height="4" rx="2"/><rect x="435" y="378" width="137" height="4" rx="2"/><rect x="435" y="390" width="112" height="4" rx="2"/></g>
+</g>
+<g filter="url(#shadow)">
+<rect x="462" y="304" width="275" height="182" rx="13" fill="#102744" stroke="#39597f"/><text x="480" y="330" fill="#e0ecff" font-size="12" font-weight="600">Audit history</text><text x="719" y="330" text-anchor="end" fill="#809fc7" font-size="9">Example</text>
+<path d="M482 354H717M482 387H717M482 420H717" stroke="#294365"/>
+<path d="M483 415L519 405L554 411L591 380L627 389L664 365L715 351V445H483Z" fill="url(#area)"/><path d="M483 415L519 405L554 411L591 380L627 389L664 365L715 351" stroke="#8fc4ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="715" cy="351" r="4" fill="#c7e2ff" stroke="#397ee2" stroke-width="3"/>
+<g font-size="9" fill="#809fc7"><text x="482" y="460">Week 1</text><text x="552" y="460">Week 2</text><text x="620" y="460">Week 3</text><text x="686" y="460">Week 4</text></g>
+</g>
+<g filter="url(#shadow)"><rect x="478" y="28" width="244" height="70" rx="11" fill="#143255" stroke="#426a9a"/><rect x="492" y="44" width="36" height="36" rx="9" fill="#244b7c"/><path d="M500 67L507 57L512 62L521 50M516 50H521V55" stroke="#9ac8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><text x="540" y="56" fill="#dceaff" font-size="12" font-weight="600">SEO &amp; GEO analysis</text><text x="540" y="75" fill="#95b3d8" font-size="10">Content · Metadata · Structure</text></g>
+</g></svg>

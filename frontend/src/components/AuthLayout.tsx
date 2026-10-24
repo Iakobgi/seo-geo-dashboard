@@ -8,17 +8,15 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <aside className="auth-story">
         <Brand light />
         <div className="auth-story-copy">
-          <p className="eyebrow">YOUR NEXT ADVANTAGE</p>
+          <p className="eyebrow">SEO & GEO WORKSPACE</p>
           <h2>
-            Great content
+            Website audits.
             <br />
-            deserves to
-            <br />
-            be <em>discovered.</em>
+            <span>SEO &amp; GEO analysis.</span>
           </h2>
           <p>
-            A clearer view of your search visibility. A smarter way to decide
-            what comes next.
+            Review page content, search metadata, and AI readiness in one
+            workspace.
           </p>
           {[
             "Understand your SEO & AI readiness",
@@ -32,7 +30,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           ))}
         </div>
         <p className="auth-story-footer">
-          SEO/GEO AI · Built for the next era of search
+          SEO/GEO AI · Website analysis and recommendations
         </p>
       </aside>
       <main id="main-content" className="auth-form-side">

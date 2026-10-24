@@ -4,7 +4,7 @@ export default function Agent() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Give your next idea a head start."
+        title="AI content workspace"
         description="Generate an optimization plan and draft content, ready for your review."
         eyebrow="AI WORKSPACE"
       />

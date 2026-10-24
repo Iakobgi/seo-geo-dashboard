@@ -77,7 +77,7 @@ export default function Audits() {
   return (
     <div className="space-y-6">
       <PageHeading
-        title="Every audit. A new opportunity."
+        title="Website audits"
         description="Explore page insights, compare scores, and keep your next steps organized."
       />
       {error && <Notice retry={refresh}>{error}</Notice>}
