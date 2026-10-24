@@ -218,3 +218,11 @@ class TestStructuredDataExtraction:
 
         assert page.noindex == True
         assert page.nofollow == False
+
+
+def test_internal_domain_matching_removes_only_the_www_prefix():
+    crawler = CrawlerService()
+    crawler._base_domain = "www.webexample.com"
+    assert crawler._is_internal_url("https://webexample.com/page")
+    assert not crawler._is_internal_url("https://ebexample.com/page")
+    assert not crawler._is_internal_url("https://example.com/page")

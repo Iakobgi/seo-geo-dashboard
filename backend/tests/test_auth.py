@@ -273,3 +273,57 @@ def test_email_report_does_not_claim_delivery_when_unconfigured(client):
         response = client.post(f'/reports/audit/{audit_id}/email', headers=headers)
     assert response.status_code == 200
     assert response.json()['emailed'] is False
+
+@pytest.mark.parametrize('payload', [
+    {'max_pages': 0}, {'max_pages': 21}, {'max_depth': -1}, {'max_depth': 4},
+])
+def test_site_crawl_rejects_unbounded_requests(client, payload):
+    headers = _login_headers(client)
+    response = client.post('/audits/crawl', json={'url': 'https://example.com/', **payload}, headers=headers)
+    assert response.status_code == 422
+
+
+def test_site_crawl_requires_auth_and_returns_extracted_data(client):
+    from unittest.mock import AsyncMock, patch
+    headers = _login_headers(client)
+    payload = {'url': 'https://example.com/', 'max_pages': 5}
+    assert client.post('/audits/crawl', json=payload).status_code in (401, 403)
+    crawl = {'start_url': payload['url'], 'pages_crawled': 1, 'pages': [
+        {'url': payload['url'], 'status_code': 200, 'title': 'Example', 'noindex': True, 'nofollow': True}
+    ], 'crawl_duration': 0.1, 'duplicate_titles': {'Example': [payload['url'], payload['url']+'two']}}
+    with patch('app.routes.audits.create_crawl', new=AsyncMock(return_value=crawl)) as mock:
+        response = client.post('/audits/crawl', json=payload, headers=headers)
+    assert response.status_code == 200
+    assert response.json()['pages'][0]['nofollow'] is True
+    assert response.json()['pages'][0]['noindex'] is True
+    assert response.json()['duplicate_titles'] == crawl['duplicate_titles']
+    assert mock.await_args.kwargs['respect_robots'] is True
+
+
+def test_site_crawl_timeout_has_actionable_message(client):
+    from unittest.mock import AsyncMock, patch
+    headers = _login_headers(client)
+    with patch('app.routes.audits.create_crawl', new=AsyncMock(side_effect=TimeoutError)):
+        response = client.post('/audits/crawl', json={'url': 'https://example.com/'}, headers=headers)
+    assert response.status_code == 408
+    assert 'smaller page limit' in response.json()['detail']
+
+
+def test_audit_comparison_scores_and_account_isolation(client):
+    from app.database import SessionLocal
+    from app import models
+    headers = _login_headers(client)
+    with SessionLocal() as db:
+        user = db.query(models.User).filter_by(email='qa@example.com').one()
+        before = models.Audit(user_id=user.id, url='https://example.com/', seo_score=40, geo_score=30)
+        after = models.Audit(user_id=user.id, url='https://example.com/', seo_score=60, geo_score=25)
+        other = models.User(email='other-compare@example.com', hashed_password='unused-test-hash')
+        db.add_all([before, after, other]); db.flush()
+        private = models.Audit(user_id=other.id, url='https://other.example/', seo_score=99)
+        db.add(private); db.commit()
+        first, second, foreign = before.id, after.id, private.id
+    response = client.get(f'/audits/compare?audit_id_1={first}&audit_id_2={second}', headers=headers)
+    assert response.status_code == 200
+    assert response.json()['seo_score_change'] == 20
+    assert response.json()['geo_score_change'] == -5
+    assert client.get(f'/audits/compare?audit_id_1={first}&audit_id_2={foreign}', headers=headers).status_code == 404

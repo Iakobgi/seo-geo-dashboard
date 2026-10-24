@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import asyncio
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -32,13 +33,18 @@ async def crawl(
 ):
     """Crawl a URL and return page data without creating an audit record."""
     try:
-        crawl_data = await create_crawl(
-            url=crawl_request.url,
-            max_pages=crawl_request.max_pages,
-            max_depth=crawl_request.max_depth,
-            respect_robots=crawl_request.respect_robots,
+        crawl_data = await asyncio.wait_for(
+            create_crawl(
+                url=crawl_request.url,
+                max_pages=crawl_request.max_pages,
+                max_depth=crawl_request.max_depth,
+                respect_robots=crawl_request.respect_robots,
+            ),
+            timeout=150,
         )
         return crawl_data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=408, detail="The crawl took too long. Try a smaller page limit or a different starting URL.")
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Could not crawl URL: {exc}")
 

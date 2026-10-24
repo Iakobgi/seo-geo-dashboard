@@ -101,8 +101,8 @@ class CrawlerService:
         parsed = urlparse(url)
         netloc = parsed.netloc.lower()
         # Strip www. prefix for comparison
-        base_without_www = self._base_domain.lower().lstrip("www.")
-        netloc_without_www = netloc.lstrip("www.")
+        base_without_www = self._base_domain.lower().removeprefix("www.")
+        netloc_without_www = netloc.removeprefix("www.")
         return netloc_without_www == base_without_www or netloc == self._base_domain.lower()
 
     def _can_fetch(self, url: str) -> bool:

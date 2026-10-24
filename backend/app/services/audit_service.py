@@ -236,6 +236,7 @@ async def create_crawl(
                 "load_time": p.load_time,
                 "canonical_url": p.canonical_url,
                 "noindex": p.noindex,
+                "nofollow": p.nofollow,
             }
             for p in crawl_result.pages
         ],

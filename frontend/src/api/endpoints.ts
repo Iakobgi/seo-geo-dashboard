@@ -46,6 +46,7 @@ export interface AgentResult {
 }
 
 export interface Finding {
+  url: string;
   id: number;
   category: string;
   severity: string;
@@ -102,4 +103,49 @@ export const agentApi = {
 
 export const reportsApi = {
   emailAudit: (auditId: number) => api.post(`/reports/audit/${auditId}/email`),
+};
+
+export interface CrawledPage {
+  url: string;
+  status_code: number | null;
+  title: string | null;
+  meta_description: string | null;
+  h1: string | null;
+  word_count: number;
+  images_count: number;
+  internal_links_count: number;
+  external_links_count: number;
+  load_time: number | null;
+  canonical_url: string | null;
+  noindex: boolean;
+}
+export interface CrawlResult {
+  start_url: string;
+  pages_crawled: number;
+  pages: CrawledPage[];
+  broken_internal_links: string[];
+  duplicate_titles: Record<string, string[]>;
+  duplicate_meta_descriptions: Record<string, string[]>;
+  robots_txt_found: boolean;
+  sitemap_urls: string[];
+  crawl_duration: number;
+}
+export const crawlApi = {
+  run: (url: string, maxPages: number) =>
+    api.post<CrawlResult>("/audits/crawl", {
+      url,
+      max_pages: maxPages,
+      max_depth: 2,
+      respect_robots: true,
+    }),
+};
+export interface AuditComparison {
+  seo_score_change: number;
+  geo_score_change: number;
+}
+export const comparisonApi = {
+  get: (baseline: number, comparison: number) =>
+    api.get<AuditComparison>("/audits/compare", {
+      params: { audit_id_1: baseline, audit_id_2: comparison },
+    }),
 };

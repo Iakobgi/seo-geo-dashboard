@@ -108,8 +108,8 @@ class ScoreBreakdownOut(BaseModel):
 
 class CrawlRequest(BaseModel):
     url: str
-    max_pages: int = 10
-    max_depth: int = 2
+    max_pages: int = Field(default=10, ge=1, le=20)
+    max_depth: int = Field(default=2, ge=0, le=3)
     respect_robots: bool = True
 
 

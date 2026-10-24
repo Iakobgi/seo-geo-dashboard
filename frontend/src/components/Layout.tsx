@@ -3,6 +3,9 @@ import type { ReactNode } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
+  Network,
+  Columns2,
+  TextCursorInput,
   Search,
   Tags,
   Sparkles,
@@ -17,6 +20,9 @@ import { Brand } from "./UI";
 const navItems = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { to: "/audits", label: "Website audits", icon: Search },
+  { to: "/site-crawl", label: "Site crawl", icon: Network },
+  { to: "/compare", label: "Compare audits", icon: Columns2 },
+  { to: "/snippet", label: "Search snippet", icon: TextCursorInput },
   { to: "/keywords", label: "Keyword tracking", icon: Tags },
   { to: "/recommendations", label: "Recommendations", icon: ListChecks },
   { to: "/agent", label: "AI workspace", icon: Sparkles },

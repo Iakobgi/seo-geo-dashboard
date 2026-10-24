@@ -13,6 +13,9 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+const SiteCrawl = lazy(() => import("./pages/SiteCrawl"));
+const AuditCompare = lazy(() => import("./pages/AuditCompare"));
+const SnippetEditor = lazy(() => import("./pages/SnippetEditor"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Audits = lazy(() => import("./pages/Audits"));
 const Keywords = lazy(() => import("./pages/Keywords"));
@@ -86,6 +89,30 @@ const App: React.FC = () => {
               element={
                 <PrivateRoute>
                   <Agent />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/site-crawl"
+              element={
+                <PrivateRoute>
+                  <SiteCrawl />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/compare"
+              element={
+                <PrivateRoute>
+                  <AuditCompare />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/snippet"
+              element={
+                <PrivateRoute>
+                  <SnippetEditor />
                 </PrivateRoute>
               }
             />

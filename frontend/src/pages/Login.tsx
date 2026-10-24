@@ -19,7 +19,7 @@ export default function Login() {
   const from = location.state?.from;
   const destination =
     typeof from === "string" &&
-    /^\/(dashboard|audits|keywords|recommendations|agent)(\?|$)/.test(from)
+    /^\/(dashboard|audits|keywords|recommendations|agent|site-crawl|compare|snippet)(\?|$)/.test(from)
       ? from
       : "/dashboard";
   if (restoring) return <Loading />;
